@@ -1,17 +1,8 @@
 # Specification Repository
 
-This repository hosts various technical specifications and documentation for reference and implementation guidance.
+The main documentation is in the `/docs` directory. You can access it [here](docs/README.md).
 
-## Chat Completions API
-
-The [Chat Completions API Specification](https://mingzilla.github.io/specification/streaming-api-spec) provides detailed guidelines for implementing a chat completions API that supports both regular invocations and streaming responses.
-
-Key features:
-- JSON and SSE streaming formats
-- Request and response format examples
-- Error handling guidelines
-- Client and server implementation examples
-- Strictly follows RPC (Remote Procedure Call) Specification, which is compatible with MCP (Model Context Protocol). Refer to https://spec.modelcontextprotocol.io for details
+Alternatively, visit the GitHub Pages site for the rendered version: [https://mingzilla.github.io/specification/](https://mingzilla.github.io/specification/)
 
 ## License
 
