@@ -44,13 +44,6 @@ Authorization: Bearer <your_api_key>
   ],
   "stream": false,                // Optional: Enable streaming (default: false)
   "temperature": 0.7,             // Optional: Controls randomness
-  "max_tokens": 500,              // Optional: Maximum tokens to generate
-  "top_p": 0.95,                  // Optional: Nucleus sampling parameter
-  "top_k": 40,                    // Optional: Top-k sampling parameter
-  "stop": ["###"],                // Optional: Array of stop sequences
-  "frequency_penalty": 0.0,       // Optional: Reduce repetition of tokens
-  "presence_penalty": 0.0,        // Optional: Reduce topic repetition
-  "seed": 123                     // Optional: Random seed for reproducibility
 }
 ~~~
 
@@ -76,12 +69,7 @@ Authorization: Bearer <your_api_key>
     "role": "assistant",
     "content": "I'm doing well, thank you for asking! How can I help you today?"
   },
-  "done": true,
-  "usage": {
-    "prompt_tokens": 25,
-    "completion_tokens": 16,
-    "total_tokens": 41
-  }
+  "done": true
 }
 ~~~
 
