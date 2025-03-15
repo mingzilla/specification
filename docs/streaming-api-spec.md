@@ -31,7 +31,7 @@ Authorization: Bearer <your_api_key>
 
 ~~~json
 {
-  "model": "model-name",          // Required: Model identifier
+  "model": "model-name",          // Optional: Model identifier (server side to provide default)
   "messages": [                   // Required: Conversation history
     {
       "role": "system",           // "system", "user", or "assistant" 
