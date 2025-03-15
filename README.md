@@ -11,6 +11,7 @@ Key features:
 - Request and response format examples
 - Error handling guidelines
 - Client and server implementation examples
+- Strictly follows RPC (Remote Procedure Call) Specification, which is compatible with MCP (Model Context Protocol). Refer to https://spec.modelcontextprotocol.io for details
 
 ## License
 
