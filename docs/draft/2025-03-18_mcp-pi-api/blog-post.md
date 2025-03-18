@@ -23,11 +23,13 @@ User → Knowledge Base → Template → LLM → Response
 
 ## What I have Created
 
+Github: [https://github.com/mingzilla/pi-api-mcp-server](https://github.com/mingzilla/pi-api-mcp-server)
+
 I've built an MCP Server for the Panintelligence API that contains the most fundamental parts of our PI system. If you're an existing customer, it's already available for you to use right now.
 
 The purpose of this article isn't just to show how you can use the PI MCP Server, but also to give you an idea of how you can leverage MCP for your own systems, potentially bringing numerous benefits. By walking you through how our MCP Server works, I'm confident that smart people like you can come up with excellent ideas to apply these concepts to your own systems.
 
-The GitHub repository is available at https://github.com/mingzilla/pi-api-mcp-server, published as an open-source project, so feel free to explore and use it.
+The GitHub repository is published as an open-source project, so feel free to explore and use it.
 
 ## Usage Scenario 1
 
