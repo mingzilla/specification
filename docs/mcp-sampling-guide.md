@@ -1,4 +1,4 @@
-# Understanding MCP Sampling: Enabling Servers to Access LLMs
+# Understanding MCP Sampling - Enabling Servers to Access LLMs
 
 ## Introduction
 

@@ -1,0 +1,6 @@
+title: "Understanding MCP Sampling - Enabling Servers to Access LLMs"
+description: A detailed guide on MCP sampling and enabling servers to access LLMs.
+baseurl: "/docs"
+theme: minima
+safe: false    # Necessary for Mermaid.js integration
+markdown: kramdown # Markdown processor
