@@ -6,17 +6,35 @@ This document outlines the specifications for a chat completions API that suppor
 
 - Follows Ollama's response format structure
 - Supports both traditional request/response and streaming modes
-- Separate endpoint for SSE streaming
+- Separate endpoints for different response types
 - Clean, consistent, and easy-to-implement interfaces
 - Minimalist JSON structure for efficient parsing
 - Proper termination signals for streams
 
 ## Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/chat/completions` | POST | For both regular invocations and JSON streaming |
-| `/chat/sse` | POST | For SSE streaming (Server-Sent Events) |
+| Endpoint       | Method | Description                            | WebFlux Return Type                           |
+| -------------- | ------ | -------------------------------------- | --------------------------------------------- |
+| `/chat/json`   | POST   | For regular non-streaming responses    | `Mono<LlmClientOutput>`                       |
+| `/chat/stream` | POST   | For JSON streaming responses           | `Flux<LlmClientOutputChunk>`                  |
+| `/chat/sse`    | POST   | For SSE streaming (Server-Sent Events) | `Flux<ServerSentEvent<LlmClientOutputChunk>>` |
+
+## Why Separate Endpoints?
+
+While many LLM providers use a single endpoint with a `stream` parameter to handle both streaming and non-streaming requests, this approach creates significant implementation challenges. Separate endpoints offer several advantages:
+
+1. **Different Response Handling Logic**: The code required to process streaming vs. non-streaming responses differs substantially.
+2. **Different Response Formats**: Non-streaming responses return a complete JSON object, while streaming responses deliver sequences of chunks with different formats. Spring WebFlux and other non-blocking frameworks enforce different return types for these patterns (e.g., `Mono` for single responses, `Flux` for streams).
+3. **Reduced Complexity**: Separate endpoints allow for cleaner, more focused implementation of each response type.
+4. **Clear API Contract**: Makes it explicit to API consumers which endpoint to use for each use case.
+5. **Simplified Error Handling**: Specialized error handling can be implemented for each response type.
+6. **Focused Implementation**: Each endpoint can be implemented with code specifically tailored for its response type.
+7. **Performance Optimization**: Each endpoint can be optimized for its specific response pattern.
+8. **Independent Testing**: Easier to test and validate each response type separately.
+9. **Framework Compatibility**: Directly aligns with reactive framework patterns, such as Spring WebFlux's return type requirements:
+   - `/chat/json` can return a `Mono<LlmClientOutput>` for a single complete response
+   - `/chat/stream` can return a `Flux<LlmClientOutputChunk>` for a stream of JSON chunks
+   - `/chat/sse` can return a `Flux<ServerSentEvent<LlmClientOutputChunk>>` for SSE streaming
 
 ## Request Format
 
@@ -27,7 +45,7 @@ Content-Type: application/json
 Authorization: Bearer <your_api_key>
 ~~~
 
-### Request Body for `/chat/completions`
+### Request Body for `/chat/json`
 
 ~~~json
 {
@@ -42,8 +60,26 @@ Authorization: Bearer <your_api_key>
       "content": "Hello, how are you?"
     }
   ],
-  "stream": false,                // Optional: Enable streaming (default: false)
-  "temperature": 0.7,             // Optional: Controls randomness
+  "temperature": 0.7              // Optional: Controls randomness
+}
+~~~
+
+### Request Body for `/chat/stream`
+
+~~~json
+{
+  "model": "model-name",          // Optional: Model identifier (server side to provide default)
+  "messages": [                   // Required: Conversation history
+    {
+      "role": "system",           // "system", "user", or "assistant" 
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    }
+  ],
+  "temperature": 0.7              // Optional: Controls randomness
 }
 ~~~
 
@@ -51,14 +87,18 @@ Authorization: Bearer <your_api_key>
 
 ~~~json
 {
-  // Same parameters as /chat/completions 
-  // (except "stream" which is always true for SSE)
+  // Same parameters as other endpoints
+  "model": "model-name",
+  "messages": [
+    // conversation history
+  ],
+  "temperature": 0.7
 }
 ~~~
 
 ## Response Formats
 
-### 1. Regular (Non-Streaming) Response
+### 1. Regular (Non-Streaming) Response from `/chat/json`
 
 ~~~json
 {
@@ -73,7 +113,7 @@ Authorization: Bearer <your_api_key>
 }
 ~~~
 
-### 2. JSON Streaming Response Format
+### 2. JSON Streaming Response from `/chat/stream`
 
 #### JSON Streaming Response Format (Formatted for readability)
 
@@ -126,13 +166,13 @@ For RPC compliance, each JSON response is sent as a single line ending with a ne
 {"message":{"role":"assistant","content":", thank you!"},"done":true,"index":2}\n
 ~~~
 
-### 3. SSE Streaming Response Format
+### 3. SSE Streaming Response from `/chat/sse`
 
 #### SSE Streaming Response Format (Formatted for readability)
 
 Each chunk is formatted as an SSE message. The example below shows the logical structure:
 
-~~~json
+~~~
 // First chunk
 data: {
   "message": {
@@ -182,13 +222,13 @@ The last chunk is a special `data: [END]\n\n` message to signal the end of the s
 
 ## Response Headers
 
-### Regular Response Headers
+### Regular Response Headers (`/chat/json`)
 
 ~~~
 Content-Type: application/json
 ~~~
 
-### JSON Streaming Response Headers
+### JSON Streaming Response Headers (`/chat/stream`)
 
 ~~~
 Content-Type: application/json
@@ -197,7 +237,7 @@ Cache-Control: no-cache
 Connection: keep-alive
 ~~~
 
-### SSE Streaming Response Headers
+### SSE Streaming Response Headers (`/chat/sse`)
 
 ~~~
 Content-Type: text/event-stream
@@ -248,26 +288,24 @@ This format is fully compliant with the SSE specification and will be automatica
 ### Example: Regular Invocation
 
 ~~~bash
-curl -X POST http://your-api.example/chat/completions \
+curl -X POST http://your-api.example/chat/json \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_api_key" \
   -d '{
     "model": "model-name",
-    "messages": [{"role": "user", "content": "Hello, world!"}],
-    "stream": false
+    "messages": [{"role": "user", "content": "Hello, world!"}]
   }'
 ~~~
 
 ### Example: JSON Streaming
 
 ~~~bash
-curl -X POST http://your-api.example/chat/completions \
+curl -X POST http://your-api.example/chat/stream \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_api_key" \
   -d '{
     "model": "model-name",
-    "messages": [{"role": "user", "content": "Hello, world!"}],
-    "stream": true
+    "messages": [{"role": "user", "content": "Hello, world!"}]
   }'
 ~~~
 
