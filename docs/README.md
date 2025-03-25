@@ -20,6 +20,11 @@ The [Understanding MCP Sampling](https://mingzilla.github.io/specification/mcp-s
 MCP Sampling is to implement a sampleHandler callback function, which can be called by the MCP Server. Since the callback function is on the client side, the client side can call a LLM via HTTP REST requests, or you can ask a user to approve an action.
 
 
+## Chat Completion Integration (Draft)
+
+- [Spring Web Flux - Non-Blocking Requests](https://mingzilla.github.io/specification/spring-web-flux)
+- [LlmClient - Draft Design Spec](https://mingzilla.github.io/specification/llm-client-spec-draft)
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
