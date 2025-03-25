@@ -109,7 +109,71 @@ sink.tryEmitValue("single value");
 // sink.tryEmitError(new RuntimeException("Something went wrong")); // Emit an error
 ```
 
+If you already have a value, and you want it to be merged into the reactive flow:
+
+```java
+// Create a Mono with an immediately available value
+Mono<String> mono = Mono.just("static value");
+
+// Subscribe to it
+mono.subscribe(
+    data -> System.out.println("Received: " + data),
+    error -> System.err.println("Error: " + error),
+    () -> System.out.println("Completed")
+);
+```
+
 The core concepts are the same in both frameworks - you create streams (Observables/Flux/Mono), transform them with operators, and subscribe to receive the results. Both frameworks handle the asynchronous processing and event propagation behind the scenes.
+
+----
+
+## Comparison of Mono Creation Methods
+
+| Method                | Emits      | Execution Timing | Threading         | Best For                               |
+| --------------------- | ---------- | ---------------- | ----------------- | -------------------------------------- |
+| `Mono.just(value)`    | Value      | Eager            | Subscriber thread | Simple, immediate values               |
+| `Mono.fromCallable()` | Value      | Lazy             | Configurable      | Blocking operations that return values |
+| `Mono.fromRunnable()` | Completion | Lazy             | Configurable      | Side effects without return values     |
+| `Sinks.One`           | Value      | Deferred         | Any thread        | Programmatic emission control          |
+| `Mono.empty()`        | Completion | Immediate        | Subscriber thread | Signaling completion without value     |
+| `Mono.error()`        | Error      | Immediate        | Subscriber thread | Immediate error signaling              |
+| `Mono.defer()`        | Varies     | Lazy per sub     | Configurable      | Fresh state per subscriber             |
+
+### Key Differences:
+- **Eager vs Lazy**: `just()`, `empty()`, `error()` execute immediately; others wait for subscription
+- **Value Production**: Only `just()`, `fromCallable()`, and `Sinks.One` emit actual values
+- **Thread Control**: `fromCallable()`/`fromRunnable()` + `subscribeOn()` vs `Sinks` direct control
+- **Re-execution**: `defer()` creates new Mono per subscription vs others are shared
+
+----
+
+## Conversion Operators
+
+| Situation   | Operator      | Result |
+| ----------- | ------------- | ------ |
+| Mono → Flux | flatMapMany   | Flux   |
+| Flux → Mono | collectList() | Mono   |
+| Flux → Mono | reduce()      | Mono   |
+
+### Usage Example
+
+```java
+// Mono -> Flux
+Mono.fromCallable(inputSupplier::get)
+    .subscribeOn(Schedulers.boundedElastic())
+    .flatMapMany(input -> {
+        return webClient.post().uri(input.url()).retrieve()
+            .bodyToFlux(String.class)
+            // ... rest of Flux operators
+    })
+
+// Flux -> Mono: collectList()
+Mono<List<Integer>> monoList = Flux.just(1, 2, 3, 4, 5).collectList();
+
+// Flux -> Mono: reduce()
+Mono<Integer> sumMono = Flux.just(1, 2, 3, 4, 5).reduce(0, (acc, next) -> acc + next);
+
+```
 
 ----
 
