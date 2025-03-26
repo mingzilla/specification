@@ -5,6 +5,7 @@ This document contains the Python code for a Lambda function that acts as a prox
 ## Lambda Function Code
 
 - [bedrock-lambda-proxy.py](bedrock-lambda-proxy.py)
+- [bedrock-streaming-docs.md](bedrock-streaming-docs.md) - Detailed documentation on streaming implementation
 
 ## Deployment Instructions
 
@@ -39,7 +40,8 @@ Your Lambda function needs permission to invoke Bedrock models. Add the followin
         {
             "Effect": "Allow",
             "Action": [
-                "bedrock:InvokeModel"
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
             ],
             "Resource": "*"
         }
@@ -77,15 +79,16 @@ The Lambda function is configured to use Bearer token authentication if an `AUTH
 
 ### 3. Configure Function URL or API Gateway
 
-#### Option A: Function URL (Simplest)
+#### Option A: Function URL (Recommended for Streaming)
 
 1. In the Lambda console, go to the "Configuration" tab
 2. Select "Function URL" from the left menu
 3. Click "Create function URL"
 4. Auth type: Select "NONE" for testing, or "AWS_IAM" for production
-5. Configure CORS as needed
-6. Click "Save"
-7. Note the Function URL that is generated
+5. **For streaming support**: Enable "Response streaming" option
+6. Configure CORS as needed
+7. Click "Save"
+8. Note the Function URL that is generated
 
 #### Option B: API Gateway
 
@@ -107,6 +110,17 @@ The Lambda function is configured to use Bearer token authentication if an `AUTH
 16. Create a new stage (e.g., "prod") and click "Deploy"
 17. Note the Invoke URL that is displayed
 
+## Streaming Support
+
+The Lambda proxy now supports both streaming and non-streaming requests. To use streaming:
+
+1. Add `"stream": true` to your request JSON
+2. Handle the response format appropriate to your deployment method:
+   - Lambda Function URL: SSE format with `data: [END]` as the end signal
+   - API Gateway: Array of chunks with a final `{"done": true}` object
+
+For complete details on streaming implementation, see [bedrock-streaming-docs.md](bedrock-streaming-docs.md).
+
 ## Testing Your Lambda Proxy
 
 ### Example API Call with Bearer Token Authentication
@@ -126,6 +140,9 @@ fetch('https://your-lambda-function-url-or-api-gateway-url', {
   body: JSON.stringify({
     // Required: specify which model to use
     modelId: 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0',
+    
+    // Optional: set to true for streaming response
+    stream: false,
     
     // The rest is the model-specific payload
     anthropic_version: 'bedrock-2023-05-31',
@@ -164,6 +181,7 @@ headers = {
 
 payload = {
     "modelId": "eu.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "stream": false,  # Set to true for streaming
     "anthropic_version": "bedrock-2023-05-31",
     "max_tokens": 1000,
     "messages": [
