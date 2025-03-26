@@ -4,7 +4,7 @@ This document contains the Python code for a Lambda function that acts as a prox
 
 ## Lambda Function Code
 
-- [bedrock-lambda-procy.py](bedrock-lambda-procy.py)
+- [bedrock-lambda-proxy.py](bedrock-lambda-proxy.py)
 
 ## Deployment Instructions
 
