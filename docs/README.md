@@ -25,6 +25,12 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 - [Spring Web Flux - Non-Blocking Requests](https://mingzilla.github.io/specification/spring-web-flux)
 - [LlmClient - Draft Design Spec](https://mingzilla.github.io/specification/llm-client-spec-draft)
 
+
+## AWS Bedrock Provider Implementation Solution (Draft)
+
+- [AWS Bedrock Lambda Proxy](https://mingzilla.github.io/specification/draft/2025-03-26_bed-rock-proxy/bedrock-lambda-proxy)
+- [AWS Bedrock Lambda Proxy - Customer Usage Tracking](https://mingzilla.github.io/specification/draft/2025-03-26_bed-rock-tracking/bedrock-usage-tracking)
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

@@ -1,0 +1,16 @@
+flowchart TD
+    Client[Client Application] -->|API Key + Request| APIGateway[API Gateway]
+    subgraph AWS Cloud
+        APIGateway -->|Tracks Usage per API Key| UsagePlans[Usage Plans]
+        APIGateway -->|Forwards Request| Lambda[Bedrock Lambda Proxy]
+        Lambda -->|Invoke Model| Bedrock[AWS Bedrock]
+        
+        APIGateway -.->|Usage Metrics| CloudWatch[CloudWatch]
+        CloudWatch -.->|Scheduled Export| S3[S3 Bucket]
+        S3 -.->|Process Data| Glue[AWS Glue]
+        Glue -.->|Load Data| RDS[(Analytics Database)]
+        RDS -.->|Visualization| QuickSight[Amazon QuickSight]
+    end
+    
+    Admin[Admin Dashboard] -->|Manage Customer API Keys| APIGateway
+    Admin -->|View Reports| QuickSight
