@@ -17,7 +17,9 @@
     - [Creating Dashboards](#creating-dashboards)
     - [Billing Process Example](#billing-process-example)
   - [Client Integration](#client-integration)
-    - [Integration Instructions for Customers](#integration-instructions-for-customers)
+    - [Javascript](#javascript)
+    - [Python](#python)
+    - [cURL](#curl)
     - [SDK/Client Customization](#sdkclient-customization)
   - [Maintenance and Operations](#maintenance-and-operations)
     - [Regular Maintenance Tasks](#regular-maintenance-tasks)
@@ -224,46 +226,122 @@ A typical monthly billing workflow:
 
 ## Client Integration
 
-- [client-integration.js](client-integration.js)
+### Javascript
 
-Provide your customers with the `client-integration.js` example file as a reference for integrating with your API. This JavaScript client encapsulates the API calls to your Bedrock proxy service.
+```js
+// JavaScript Example (Browser/Node.js)
+async function callBedrockAPI(prompt) {
+  const apiEndpoint = 'https://your-api-gateway-url/prod/bedrock';
+  const authToken = 'your-customer-token-here';
+  
+  const response = await fetch(apiEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
+    body: JSON.stringify({
+      // Required: specify which model to use
+      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+      
+      // Claude-specific parameters
+      anthropic_version: 'bedrock-2023-05-31',
+      max_tokens: 1000,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt
+            }
+          ]
+        }
+      ]
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+  
+  return await response.json();
+}
 
-### Integration Instructions for Customers
+// Example usage
+// callBedrockAPI("What is the capital of France?")
+//   .then(result => console.log(result))
+//   .catch(error => console.error(error));
+```
 
-1. Include the client in your application:
-   ```javascript
-   // Browser
-   <script src="bedrock-client.js"></script>
-   
-   // Node.js
-   const { BedrockClient } = require('./bedrock-client.js');
-   ```
+### Python
 
-2. Initialize the client with your API key:
-   ```javascript
-   const client = new BedrockClient({
-     apiEndpoint: 'https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/prod/bedrock',
-     apiKey: 'YOUR_API_KEY_HERE',
-     defaultModel: 'anthropic.claude-3-sonnet-20240229-v1:0'
-   });
-   ```
+```python
+import requests
 
-3. Make calls to Bedrock models:
-   ```javascript
-   const response = await client.callModel({
-     messages: [
-       {
-         role: 'user',
-         content: [
-           {
-             type: 'text',
-             text: 'What is the capital of France?'
-           }
-         ]
-       }
-     ]
-   });
-   ```
+def call_bedrock_api(prompt):
+    api_endpoint = "https://your-api-gateway-url/prod/bedrock"
+    auth_token = "your-customer-token-here"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {auth_token}"
+    }
+    
+    payload = {
+        "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1000,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+    
+    response = requests.post(api_endpoint, headers=headers, json=payload)
+    response.raise_for_status()  # Raise exception for 4XX/5XX responses
+    
+    return response.json()
+
+# Example usage
+# try:
+#     result = call_bedrock_api("What is the capital of France?")
+#     print(result)
+# except Exception as e:
+#     print(f"Error: {e}")
+```
+
+### cURL
+
+```sh
+curl -X POST https://your-api-gateway-url/prod/bedrock \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-customer-token-here" \
+  -d '{
+    "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "anthropic_version": "bedrock-2023-05-31",
+    "max_tokens": 1000,
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text", 
+            "text": "What is the capital of France?"
+          }
+        ]
+      }
+    ]
+  }'
+
+```
 
 ### SDK/Client Customization
 
