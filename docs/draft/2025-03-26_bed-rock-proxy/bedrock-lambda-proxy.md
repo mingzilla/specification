@@ -112,12 +112,12 @@ The Lambda function is configured to use Bearer token authentication if an `AUTH
 
 ## Streaming Support
 
-The Lambda proxy now supports both streaming and non-streaming requests. To use streaming:
+The Lambda proxy supports both streaming and non-streaming requests. To use streaming:
 
 1. Add `"stream": true` to your request JSON
 2. Handle the response format appropriate to your deployment method:
-   - Lambda Function URL: SSE format with `data: [END]` as the end signal
-   - API Gateway: Array of chunks with a final `{"done": true}` object
+   - Lambda Function URL: SSE format with `data: {"content": "chunk text"}\n\n` chunks and `data: [END]\n\n` as the end signal
+   - API Gateway: Array of chunks with objects like `{"content": "chunk text"}` and a final `{"done": true}` object
 
 For complete details on streaming implementation, see [bedrock-streaming-docs.md](bedrock-streaming-docs.md).
 
