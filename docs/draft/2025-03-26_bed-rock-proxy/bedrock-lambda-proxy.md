@@ -8,6 +8,7 @@ This document contains the Python code for a Lambda function that acts as a prox
 import json
 import boto3
 import os
+import secrets
 
 # Initialize the Bedrock Runtime client
 bedrock_runtime = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION'))
@@ -28,6 +29,32 @@ def lambda_handler(event, context):
             'headers': headers,
             'body': json.dumps({'message': 'CORS preflight response'})
         }
+    
+    # Verify Bearer token authentication
+    request_headers = event.get('headers', {})
+    authorization = request_headers.get('Authorization')
+    
+    # Get expected token from environment variable
+    expected_token = os.environ.get('AUTH_TOKEN')
+    
+    # Check if authentication is required (token exists in environment)
+    if expected_token:
+        if not authorization or not authorization.startswith('Bearer '):
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Authorization header missing or invalid format. Use Bearer token.'})
+            }
+        
+        # Extract the token
+        token = authorization.replace('Bearer ', '')
+        
+        if token != expected_token:
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Invalid token'})
+            }
     
     try:
         # Parse the request body
@@ -91,7 +118,9 @@ def lambda_handler(event, context):
 8. In the "Code" tab, paste the code above into the inline editor
 9. Click "Deploy" to save your changes
 
-### 2. Configure IAM Permissions
+### 2. Configure IAM Permissions and Authentication
+
+#### A. IAM Permissions
 
 Your Lambda function needs permission to invoke Bedrock models. Add the following policy to your Lambda's execution role:
 
@@ -119,6 +148,30 @@ Your Lambda function needs permission to invoke Bedrock models. Add the followin
 6. Click "Review policy"
 7. Name the policy (e.g., `bedrock-invoke-policy`)
 8. Click "Create policy"
+
+#### B. Set Up Bearer Token Authentication
+
+The Lambda function is configured to use Bearer token authentication if an `AUTH_TOKEN` environment variable is set:
+
+1. Generate a Secure Token:
+   - Option 1: Use a secure token generator website like [passwordsgenerator.net](https://passwordsgenerator.net/)
+   - Option 2: Generate a token via command line:
+     ```bash
+     # On Linux/Mac
+     openssl rand -base64 32
+     
+     # On Windows PowerShell
+     [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+     ```
+
+2. Add the Token to Lambda Environment Variables:
+   - In the Lambda console, go to the "Configuration" tab
+   - Click on "Environment variables"
+   - Click "Edit"
+   - Add a key `AUTH_TOKEN` with your generated token as the value
+   - Click "Save"
+
+3. Your clients will now need to include this token in the Authorization header as a Bearer token
 
 ### 3. Configure Function URL or API Gateway
 
@@ -154,12 +207,20 @@ Your Lambda function needs permission to invoke Bedrock models. Add the followin
 
 ## Testing Your Lambda Proxy
 
-### Example API Call (using fetch in JavaScript)
+### Example API Call with Bearer Token Authentication
+
+#### JavaScript (using fetch)
 
 ```javascript
+// Your AUTH_TOKEN from Lambda environment variables
+const authToken = 'your-generated-token-here';
+
 fetch('https://your-lambda-function-url-or-api-gateway-url', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${authToken}`
+  },
   body: JSON.stringify({
     // Required: specify which model to use
     modelId: 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0',
@@ -185,13 +246,19 @@ fetch('https://your-lambda-function-url-or-api-gateway-url', {
 .catch(error => console.error('Error:', error));
 ```
 
-### Example API Call (using Python requests)
+#### Python (using requests)
 
 ```python
 import requests
 import json
 
 url = "https://your-lambda-function-url-or-api-gateway-url"
+auth_token = "your-generated-token-here"  # Your AUTH_TOKEN from Lambda environment variables
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {auth_token}"
+}
 
 payload = {
     "modelId": "eu.anthropic.claude-3-5-sonnet-20240620-v1:0",
@@ -210,15 +277,40 @@ payload = {
     ]
 }
 
-response = requests.post(url, json=payload)
+response = requests.post(url, headers=headers, json=payload)
 print(response.json())
 ```
+
+## Security Considerations
+
+### Token Management Best Practices
+
+1. **Secure Storage**: Never hardcode tokens in your application. Use environment variables, secure vaults, or configuration management solutions.
+
+2. **Token Rotation**: Periodically update your tokens to reduce the risk of unauthorized access.
+
+3. **Least Privilege**: Consider creating different tokens with different access levels if you have multiple applications or use cases.
+
+4. **Monitoring**: Implement logging and monitoring to detect unusual patterns that might indicate token compromise.
+
+5. **Transport Security**: Always use HTTPS to protect tokens in transit.
+
+### Additional Security Options
+
+If you need more robust security, consider:
+
+1. **JWT Tokens**: Implement JWT (JSON Web Token) validation for more sophisticated authentication with expiration and claims.
+
+2. **IP Restrictions**: Add IP-based restrictions in your Lambda function to only accept requests from trusted sources.
+
+3. **AWS WAF**: Deploy AWS WAF (Web Application Firewall) in front of your API Gateway for additional protection.
 
 ## Notes
 
 - The Lambda function is generic and works with any AWS Bedrock model - just specify the correct modelId
 - For high-traffic applications, consider increasing the Lambda's memory and timeout settings
-- For production, make sure to restrict the CORS settings and consider adding authentication
+- For production, make sure to restrict the CORS settings
 - You can add additional error handling and logging as needed
+- Authentication is optional - the Lambda will work without a token if you don't set the AUTH_TOKEN environment variable
 
 For invoking different models, you'll need to adjust the payload format according to the model's requirements. The Claude model format is shown in the examples above.
