@@ -46,7 +46,9 @@ This solution allows you to:
 
 The architecture diagram below illustrates how the components interact:
 
-![API Gateway Usage Tracking Architecture](architecture-diagram.mermaid)
+![API Gateway Usage Tracking Architecture](architecture-diagram.png)
+
+- Ref: [API Gateway Usage Tracking Architecture](architecture-diagram.mermaid)
 
 **Architecture Components:**
 - **Client Applications**: Use API keys to authenticate
