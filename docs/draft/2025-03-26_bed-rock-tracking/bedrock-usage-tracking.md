@@ -24,6 +24,7 @@
     - [Regular Maintenance Tasks](#regular-maintenance-tasks)
     - [Troubleshooting Common Issues](#troubleshooting-common-issues)
   - [Security Best Practices](#security-best-practices)
+  - [Further Enhancement](#further-enhancement)
 
 ## Overview
 
@@ -408,6 +409,16 @@ curl -X POST https://your-api-gateway-url/prod/bedrock \
    - Encrypt data at rest in S3 and DynamoDB
    - Implement TLS for all communications
    - Consider implementing VPC endpoints for AWS services
+
+---
+
+## Further Enhancement
+
+[future-enhancements.md](future-enhancements.md) for consideration. This includes e.g.:
+- Authentication & Security
+- Usage & Billing
+- Performance & Reliability
+- Customer Management
 
 ---
 
