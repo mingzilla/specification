@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'AWS CloudFormation Template for Bedrock API Usage Reporting Infrastructure'
+Description: 'AWS CloudFormation Template for Bedrock API Usage Reporting Infrastructure (Bearer Token Authentication)'
 
 Resources:
   # S3 bucket for storing usage data
@@ -10,8 +10,8 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
-  # IAM role for CloudWatch Export
-  CloudWatchExportRole:
+  # IAM role for CloudWatch Log processing
+  CloudWatchLogsProcessorRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -24,15 +24,16 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
       Policies:
-        - PolicyName: CloudWatchExportPolicy
+        - PolicyName: CloudWatchLogsProcessorPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - 'cloudwatch:GetMetricData'
-                  - 'cloudwatch:GetMetricStatistics'
-                  - 'cloudwatch:ListMetrics'
+                  - 'logs:StartQuery'
+                  - 'logs:GetQueryResults'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:DescribeLogStreams'
                 Resource: '*'
               - Effect: Allow
                 Action:
@@ -40,95 +41,170 @@ Resources:
                 Resource: !Sub '${UsageDataBucket.Arn}/*'
               - Effect: Allow
                 Action:
-                  - 'apigateway:GET'
-                Resource: '*'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:GetItem'
+                Resource: 
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/bedrock_customers'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/bedrock_tokens'
 
-  # Lambda function to export API usage to S3
+  # Lambda function to export usage data from CloudWatch Logs to S3
   ExportUsageLambda:
     Type: AWS::Lambda::Function
     Properties:
       Handler: index.handler
-      Role: !GetAtt CloudWatchExportRole.Arn
+      Role: !GetAtt CloudWatchLogsProcessorRole.Arn
       Runtime: python3.8
-      Timeout: 300
+      Timeout: 900  # 15 minutes for long-running log queries
+      MemorySize: 512
       Code:
         ZipFile: |
           import boto3
           import json
           import os
+          import time
           import datetime
           import csv
           import io
           
           def handler(event, context):
-              # Get yesterday's date
-              yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-              date_str = yesterday.strftime('%Y-%m-%d')
+              print("Starting usage data export")
+              
+              # Get yesterday's date or use date from event if provided
+              if event and 'date' in event:
+                  date_str = event['date']
+                  date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+              else:
+                  date_obj = datetime.datetime.now() - datetime.timedelta(days=1)
+                  date_str = date_obj.strftime('%Y-%m-%d')
               
               # Initialize clients
-              apigateway = boto3.client('apigateway')
-              cloudwatch = boto3.client('cloudwatch')
+              logs = boto3.client('logs')
+              dynamodb = boto3.resource('dynamodb')
               s3 = boto3.client('s3')
               
-              # Get all usage plans
-              usage_plans = apigateway.get_usage_plans()['items']
+              # Get all customers
+              customer_table = dynamodb.Table('bedrock_customers')
+              customer_response = customer_table.scan()
+              customers = customer_response.get('Items', [])
               
-              # For each usage plan, get all API keys
-              for plan in usage_plans:
-                  plan_id = plan['id']
-                  plan_name = plan['name']
+              # Get log group for Lambda function
+              log_group_name = '/aws/lambda/bedrock-proxy'  # Update with your Lambda log group name
+              
+              # Calculate time range for yesterday
+              start_time = int(datetime.datetime(date_obj.year, date_obj.month, date_obj.day, 0, 0, 0).timestamp() * 1000)
+              end_time = int(datetime.datetime(date_obj.year, date_obj.month, date_obj.day, 23, 59, 59).timestamp() * 1000)
+              
+              # Process logs for each customer
+              all_customer_data = []
+              for customer in customers:
+                  customer_id = customer['customer_id']
+                  customer_name = customer['name']
+                  print(f"Processing logs for customer: {customer_name} ({customer_id})")
                   
-                  # Get all API keys for this plan
+                  # Query logs for all requests with this customer's token
+                  # Note: This assumes your Lambda logs include a customer_id field
+                  query = f"""
+                      fields @timestamp, @message, model_id, token_count
+                      | filter customer_id = '{customer_id}'
+                      | parse @message '"modelId":"*"' as model_id_raw
+                      | stats 
+                          count(*) as request_count, 
+                          sum(token_count) as total_tokens
+                          by bin(1h) as hour, model_id
+                  """
+                  
                   try:
-                      keys = apigateway.get_usage_plan_keys(usagePlanId=plan_id)['items']
-                  except Exception as e:
-                      print(f"Error getting keys for plan {plan_id}: {str(e)}")
-                      continue
-                  
-                  # Create a CSV for this plan
-                  output = io.StringIO()
-                  writer = csv.writer(output)
-                  writer.writerow(['Date', 'PlanId', 'PlanName', 'KeyId', 'KeyName', 'Requests'])
-                  
-                  # For each key, get usage data
-                  for key in keys:
-                      key_id = key['id']
-                      key_name = key['name']
+                      # Start query
+                      start_query_response = logs.start_query(
+                          logGroupName=log_group_name,
+                          startTime=start_time,
+                          endTime=end_time,
+                          queryString=query,
+                          limit=10000
+                      )
                       
-                      try:
-                          # Get usage data for yesterday
-                          usage = apigateway.get_usage(
-                              usagePlanId=plan_id,
-                              keyId=key_id,
-                              startDate=date_str,
-                              endDate=date_str
-                          )
+                      query_id = start_query_response['queryId']
+                      
+                      # Wait for query to complete
+                      response = None
+                      status = 'Running'
+                      
+                      # Poll for results
+                      max_attempts = 60  # 10 minutes max
+                      attempt = 0
+                      
+                      while status == 'Running' and attempt < max_attempts:
+                          time.sleep(10)  # Wait 10 seconds between calls
+                          response = logs.get_query_results(queryId=query_id)
+                          status = response['status']
+                          attempt += 1
+                      
+                      # Process results
+                      if status == 'Complete':
+                          results = response['results']
                           
-                          # Extract usage data
-                          if 'items' in usage and key_id in usage['items']:
-                              usage_data = usage['items'][key_id]
-                              for api_id in usage_data:
-                                  for date, count in usage_data[api_id].items():
-                                      writer.writerow([date, plan_id, plan_name, key_id, key_name, count])
+                          # Aggregate results by hour and model
+                          customer_data = []
+                          for result in results:
+                              result_dict = {field['field']: field['value'] for field in result}
+                              
+                              customer_data.append({
+                                  'date': date_str,
+                                  'customer_id': customer_id,
+                                  'customer_name': customer_name,
+                                  'hour': result_dict.get('hour', 'unknown'),
+                                  'model_id': result_dict.get('model_id', 'unknown'),
+                                  'request_count': int(result_dict.get('request_count', '0')),
+                                  'total_tokens': int(result_dict.get('total_tokens', '0'))
+                              })
                           
-                      except Exception as e:
-                          print(f"Error getting usage for key {key_id}: {str(e)}")
-                          continue
+                          all_customer_data.extend(customer_data)
+                          print(f"Found {len(customer_data)} hourly records for {customer_name}")
+                      
+                      else:
+                          print(f"Query did not complete in time. Status: {status}")
+                  
+                  except Exception as e:
+                      print(f"Error processing logs for customer {customer_id}: {str(e)}")
+              
+              # Write all data to CSV
+              if all_customer_data:
+                  print(f"Writing {len(all_customer_data)} records to S3")
+                  
+                  output = io.StringIO()
+                  writer = csv.DictWriter(output, fieldnames=[
+                      'date', 'customer_id', 'customer_name', 'hour', 'model_id', 
+                      'request_count', 'total_tokens'
+                  ])
+                  writer.writeheader()
+                  
+                  for record in all_customer_data:
+                      writer.writerow(record)
                   
                   # Upload CSV to S3
                   bucket_name = os.environ['BUCKET_NAME']
                   s3.put_object(
                       Bucket=bucket_name,
-                      Key=f'usage/{plan_name}/{date_str}.csv',
+                      Key=f'usage/{date_str}/daily_usage.csv',
                       Body=output.getvalue(),
                       ContentType='text/csv'
                   )
                   
-                  print(f"Exported usage data for plan {plan_name} to S3")
+                  print(f"Successfully exported usage data for {date_str}")
+                  
+                  # Create a monthly summary if this is end of month
+                  is_end_of_month = (date_obj + datetime.timedelta(days=1)).day == 1
+                  if is_end_of_month:
+                      # Create monthly summary (implementation left as an exercise)
+                      # This would involve querying the entire month's data
+                      print("Creating monthly summary...")
+              
+              else:
+                  print("No usage data found for any customers")
               
               return {
                   'statusCode': 200,
-                  'body': json.dumps('Export completed successfully')
+                  'body': json.dumps(f'Export completed for {date_str}')
               }
       Environment:
         Variables:
@@ -161,7 +237,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
         Name: bedrock_usage_db
-        Description: 'Database for Bedrock API usage data'
+        Description: 'Database for Bedrock API usage data with Bearer token authentication'
 
   # Glue Crawler to catalog usage data
   UsageCrawler:

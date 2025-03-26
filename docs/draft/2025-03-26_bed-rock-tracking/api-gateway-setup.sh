@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to set up API Gateway with Usage Plans
+# Script to set up API Gateway for Bearer token authentication
 
 # Create API
 API_ID=$(aws apigateway create-rest-api \
@@ -27,15 +27,14 @@ RESOURCE_ID=$(aws apigateway create-resource \
 
 echo "Created resource with ID: $RESOURCE_ID"
 
-# Create POST method with API key required
+# Create POST method (no API key requirement)
 aws apigateway put-method \
   --rest-api-id $API_ID \
   --resource-id $RESOURCE_ID \
   --http-method POST \
-  --authorization-type NONE \
-  --api-key-required true
+  --authorization-type NONE
 
-echo "Created POST method with API key requirement"
+echo "Created POST method"
 
 # Replace with your Lambda function ARN
 LAMBDA_ARN="arn:aws:lambda:REGION:ACCOUNT_ID:function:bedrock-proxy"
@@ -59,6 +58,45 @@ aws apigateway put-method-response \
   --status-code 200 \
   --response-models '{"application/json": "Empty"}'
 
+# Create OPTIONS method for CORS
+aws apigateway put-method \
+  --rest-api-id $API_ID \
+  --resource-id $RESOURCE_ID \
+  --http-method OPTIONS \
+  --authorization-type NONE
+
+# Set up CORS integration response
+aws apigateway put-integration \
+  --rest-api-id $API_ID \
+  --resource-id $RESOURCE_ID \
+  --http-method OPTIONS \
+  --type MOCK \
+  --integration-http-method OPTIONS \
+  --request-templates '{"application/json": "{\"statusCode\": 200}"}'
+
+aws apigateway put-integration-response \
+  --rest-api-id $API_ID \
+  --resource-id $RESOURCE_ID \
+  --http-method OPTIONS \
+  --status-code 200 \
+  --response-parameters '{
+    "method.response.header.Access-Control-Allow-Headers": "'\''Content-Type,Authorization'\''"
+  }' \
+  --response-templates '{"application/json": ""}'
+
+# Set up CORS method response
+aws apigateway put-method-response \
+  --rest-api-id $API_ID \
+  --resource-id $RESOURCE_ID \
+  --http-method OPTIONS \
+  --status-code 200 \
+  --response-models '{"application/json": "Empty"}' \
+  --response-parameters '{
+    "method.response.header.Access-Control-Allow-Headers": true,
+    "method.response.header.Access-Control-Allow-Methods": true,
+    "method.response.header.Access-Control-Allow-Origin": true
+  }'
+
 # Create a deployment
 aws apigateway create-deployment \
   --rest-api-id $API_ID \
@@ -66,24 +104,6 @@ aws apigateway create-deployment \
 
 echo "Created deployment to 'prod' stage"
 
-# Create a usage plan
-USAGE_PLAN_ID=$(aws apigateway create-usage-plan \
-  --name "Bedrock-Standard-Plan" \
-  --description "Standard usage plan for Bedrock API" \
-  --throttle "rateLimit=10, burstLimit=20" \
-  --quota "limit=1000, period=MONTH" \
-  --output text \
-  --query "id")
-
-echo "Created usage plan with ID: $USAGE_PLAN_ID"
-
-# Add stage to usage plan
-aws apigateway update-usage-plan \
-  --usage-plan-id $USAGE_PLAN_ID \
-  --patch-operations "op=add,path=/apiStages,value=$API_ID:prod"
-
-echo "Added 'prod' stage to usage plan"
-
 echo "API Gateway setup complete! Use the following endpoint:"
 echo "https://$API_ID.execute-api.REGION.amazonaws.com/prod/bedrock"
-echo "Remember to create API keys for each customer and associate them with the usage plan."
+echo "Remember to provide Bearer tokens to your customers for authentication."

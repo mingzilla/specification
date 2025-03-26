@@ -20,7 +20,6 @@
     - [Javascript](#javascript)
     - [Python](#python)
     - [cURL](#curl)
-    - [SDK/Client Customization](#sdkclient-customization)
   - [Maintenance and Operations](#maintenance-and-operations)
     - [Regular Maintenance Tasks](#regular-maintenance-tasks)
     - [Troubleshooting Common Issues](#troubleshooting-common-issues)
@@ -28,21 +27,20 @@
 
 ## Overview
 
-This document provides a comprehensive guide for implementing commercial customer usage tracking for this [AWS Bedrock Lambda Proxy service](../2025-03-26_bed-rock-proxy/bedrock-lambda-proxy.md). The solution leverages AWS API Gateway with Usage Plans to track customer usage without modifying your existing Lambda function, following AWS-native patterns and community standards.
-
+This document provides a comprehensive guide for implementing commercial customer usage tracking for this [AWS Bedrock Lambda Proxy service](../2025-03-26_bed-rock-proxy/bedrock-lambda-proxy.md). The solution leverages AWS API Gateway with a DynamoDB-based token management system to track customer usage with Bearer token authentication, following AWS-native patterns and community standards.
 
 **Key Components:**
-- API Gateway with Usage Plans for authentication and usage tracking
+- API Gateway as the HTTP endpoint
+- Lambda Proxy with Bearer token authentication
 - Customer management system using DynamoDB
-- Automated analytics infrastructure with S3, Glue, and QuickSight
-- Client-side integration example for your customers
+- Automated analytics infrastructure with CloudWatch, S3, Glue, and QuickSight
+- Client-side integration examples for your customers
 
 This solution allows you to:
-1. Generate unique API keys for each customer
+1. Generate unique Bearer tokens for each customer
 2. Track usage per customer for billing purposes
-3. Set quotas and throttling limits per customer
-4. Implement various pricing models (pay-per-request, tiered, subscription)
-5. Generate detailed usage reports and visualizations
+3. Implement various pricing models (pay-per-request, tiered, subscription)
+4. Generate detailed usage reports and visualizations
 
 ## Solution Architecture
 
@@ -53,9 +51,9 @@ The architecture diagram below illustrates how the components interact:
 - Ref: [API Gateway Usage Tracking Architecture](architecture-diagram.mermaid)
 
 **Architecture Components:**
-- **Client Applications**: Use API keys to authenticate
-- **API Gateway**: Manages authentication and tracks usage via API keys and Usage Plans
-- **Lambda Function**: Your existing Bedrock proxy (no changes needed)
+- **Client Applications**: Use Bearer tokens to authenticate
+- **API Gateway**: Routes requests to the Lambda function
+- **Lambda Function**: Validates Bearer tokens and logs usage
 - **AWS Bedrock**: Provides the underlying model services
 - **Analytics Pipeline**: CloudWatch → S3 → Glue → Database → QuickSight
 - **Admin Dashboard**: For managing customers and viewing reports
@@ -68,9 +66,8 @@ The architecture diagram below illustrates how the components interact:
 
 The `api-gateway-setup.sh` script automates the creation of:
 - A REST API endpoint
-- A resource and POST method requiring an API key
+- A resource and POST method that passes through the Authorization header
 - Integration with your Lambda function
-- A default usage plan with throttling and quotas
 
 **Setup Steps:**
 
@@ -90,13 +87,13 @@ The `api-gateway-setup.sh` script automates the creation of:
    ./api-gateway-setup.sh
    ```
 
-3. Note the API endpoint URL and Usage Plan ID that are output. You'll need these for the next steps.
+3. Note the API endpoint URL that is output. You'll need this for client integration.
 
 ### Customer Management System
 
 - [customer-management.py](customer-management.py)
 
-The `customer-management.py` script provides a CLI tool for managing customers and their API keys.
+The `customer-management.py` script provides a CLI tool for managing customers and their Bearer tokens.
 
 **Setup Steps:**
 
@@ -139,25 +136,25 @@ Deploy the CloudFormation template (`reporting-setup.yml`) to set up the analyti
 
 When onboarding a new customer:
 
-1. Create an API key for the customer:
+1. Create a Bearer token for the customer:
    ```bash
    python customer-management.py create \
      --name "Customer Name" \
-     --email "customer@example.com" \
-     --usage-plan-id "a1b2c3d4"  # Your Usage Plan ID from API Gateway setup
+     --email "customer@example.com"
    ```
 
-2. The script will output a customer ID and API key. Provide this API key to your customer along with integration instructions.
+2. The script will output a customer ID and Bearer token. Provide this token to your customer along with integration instructions.
 
-3. Optionally, customize the usage plan for this customer if they need different limits:
+3. Optionally, generate a more secure token:
    ```bash
-   # Create a custom usage plan in API Gateway Console or via AWS CLI
-   aws apigateway create-usage-plan \
-     --name "Premium-Plan-CustomerName" \
-     --throttle "rateLimit=20,burstLimit=40" \
-     --quota "limit=5000,period=MONTH"
+   # Generate a secure token
+   TOKEN=$(openssl rand -base64 32)
    
-   # Then associate the customer's API key with this new plan
+   # Create customer with specified token
+   python customer-management.py create \
+     --name "Customer Name" \
+     --email "customer@example.com" \
+     --token "$TOKEN"
    ```
 
 ### Listing Customers
@@ -187,7 +184,7 @@ This retrieves the number of API calls made by the customer within the specified
 
 The reporting infrastructure automatically:
 
-1. Exports daily usage data to the S3 bucket (runs at 1:00 AM UTC)
+1. Exports daily usage data from CloudWatch Logs to the S3 bucket (runs at 1:00 AM UTC)
 2. Updates the Glue catalog (runs at 2:00 AM UTC)
 3. Makes the data available for querying through Athena or QuickSight
 
@@ -340,51 +337,49 @@ curl -X POST https://your-api-gateway-url/prod/bedrock \
       }
     ]
   }'
-
 ```
-
-### SDK/Client Customization
-
-The provided client supports different model types (Claude, Llama, etc.) and handles the appropriate payload formatting. You can customize it to:
-- Add logging
-- Include additional models
-- Implement retry logic
-- Add application-specific authentication
 
 ## Maintenance and Operations
 
 ### Regular Maintenance Tasks
 
-1. **API Key Rotation**:
-   Implement a policy for rotating API keys periodically:
+1. **Bearer Token Rotation**:
+   Implement a policy for rotating tokens periodically:
    ```bash
-   # Process for rotating a customer's API key
-   # 1. Create a new API key
-   # 2. Associate it with the usage plan
+   # Process for rotating a customer's token
+   # 1. Generate a new secure token
+   NEW_TOKEN=$(openssl rand -base64 32)
+   
+   # 2. Update the token in your database
+   python customer-management.py update-token \
+     --customer-id "CUSTOMER_ID" \
+     --token "$NEW_TOKEN"
+   
    # 3. Provide to customer
-   # 4. After customer confirms migration, delete old key
+   # 4. After customer confirms migration, invalidate old token
    ```
 
-2. **Usage Plan Adjustments**:
-   Periodically review and adjust quotas and throttling based on usage patterns:
+2. **Usage Monitoring**:
+   Periodically review usage patterns and set appropriate limits in the Lambda function:
    ```bash
-   aws apigateway update-usage-plan \
-     --usage-plan-id "USAGE_PLAN_ID" \
-     --patch-operations "op=replace,path=/quota/limit,value=2000"
+   # Update customer rate limits in DynamoDB
+   python customer-management.py update-limits \
+     --customer-id "CUSTOMER_ID" \
+     --daily-limit 1000
    ```
 
 3. **Monitoring and Alerts**:
    Set up CloudWatch alarms for:
-   - API throttling events
-   - Approaching quota limits
+   - High error rates
+   - Excessive usage
    - Unusual usage patterns
 
 ### Troubleshooting Common Issues
 
-1. **API Keys Not Working**:
-   - Verify the key is associated with the correct usage plan
-   - Check if the customer has exceeded their quota
-   - Ensure the API method requires an API key
+1. **Authentication Issues**:
+   - Verify the Bearer token is valid and correctly formatted
+   - Check if the customer's token has been rotated
+   - Ensure the Authorization header is being correctly passed through API Gateway
 
 2. **Usage Data Not Appearing**:
    - Check CloudWatch logs for the export Lambda function
@@ -392,16 +387,17 @@ The provided client supports different model types (Claude, Llama, etc.) and han
    - Check IAM permissions
 
 3. **High Latency**:
-   - Review API Gateway caching settings
    - Check Lambda concurrency limits
    - Monitor Bedrock model response times
+   - Consider adjusting Lambda memory allocation
 
 ## Security Best Practices
 
-1. **API Key Management**:
-   - Never store API keys in code repositories
-   - Implement key rotation procedures
-   - Use a secure method to distribute keys to customers
+1. **Token Management**:
+   - Generate tokens using cryptographically secure methods
+   - Never store tokens in code repositories
+   - Implement token rotation procedures
+   - Use a secure method to distribute tokens to customers
 
 2. **Access Controls**:
    - Implement least privilege IAM policies
@@ -415,4 +411,4 @@ The provided client supports different model types (Claude, Llama, etc.) and han
 
 ---
 
-**Note**: This solution follows AWS best practices and community standards for implementing a commercial model for AWS Bedrock access. It is designed to be low-maintenance, scalable, and requires no changes to your existing Lambda function.
+**Note**: This solution follows AWS best practices and community standards for implementing a commercial model for AWS Bedrock access. It is designed to be low-maintenance, scalable, and compatible with your existing Lambda function's Bearer token authentication.
