@@ -62,7 +62,7 @@ The architecture diagram below illustrates how the components interact:
 
 ### API Gateway Configuration
 
-- [API Gateway Setup Script](api-gateway-setup.sh)
+- [api-gateway-setup.sh](api-gateway-setup.sh)
 
 The `api-gateway-setup.sh` script automates the creation of:
 - A REST API endpoint
@@ -92,7 +92,7 @@ The `api-gateway-setup.sh` script automates the creation of:
 
 ### Customer Management System
 
-- [Customer Management Script](customer-management.py)
+- [customer-management.py](customer-management.py)
 
 The `customer-management.py` script provides a CLI tool for managing customers and their API keys.
 
@@ -112,7 +112,7 @@ The `customer-management.py` script provides a CLI tool for managing customers a
 
 ### Analytics Infrastructure
 
-- [Reporting Infrastructure Template](reporting-setup.yml)
+- [reporting-setup.yml](reporting-setup.yml)
 
 Deploy the CloudFormation template (`reporting-setup.yml`) to set up the analytics infrastructure:
 
@@ -224,9 +224,9 @@ A typical monthly billing workflow:
 
 ## Client Integration
 
-- [Client Integration Example](client-integration.js)
+- [client-integration.js](client-integration.js)
 
-Provide your customers with the `client-integration.js` file as a reference for integrating with your API. This JavaScript client encapsulates the API calls to your Bedrock proxy service.
+Provide your customers with the `client-integration.js` example file as a reference for integrating with your API. This JavaScript client encapsulates the API calls to your Bedrock proxy service.
 
 ### Integration Instructions for Customers
 
