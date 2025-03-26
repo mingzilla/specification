@@ -101,12 +101,11 @@ Resources:
                   customer_name = customer['name']
                   print(f"Processing logs for customer: {customer_name} ({customer_id})")
                   
-                  # Query logs for all requests with this customer's token
-                  # Note: This assumes your Lambda logs include a customer_id field
+                  # Updated query to match the Lambda's log format
                   query = f"""
-                      fields @timestamp, @message, model_id, token_count
-                      | filter customer_id = '{customer_id}'
-                      | parse @message '"modelId":"*"' as model_id_raw
+                      fields @timestamp, @message
+                      | parse @message '{{"event_type":"*","customer_id":"*","request_id":"*","model_id":"*","input_tokens":*,"output_tokens":*,"token_count":*,"duration_ms":*,"timestamp":*}}' as event_type, customer_id, request_id, model_id, input_tokens, output_tokens, token_count, duration_ms, timestamp
+                      | filter customer_id = '{customer_id}' and event_type = 'bedrock_invoke'
                       | stats 
                           count(*) as request_count, 
                           sum(token_count) as total_tokens

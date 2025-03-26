@@ -3,11 +3,36 @@ import boto3
 import os
 import secrets
 import time
+import re
 
 # Initialize the DynamoDB and Bedrock Runtime clients
 bedrock_runtime = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION'))
 dynamodb = boto3.resource('dynamodb')
 token_table = dynamodb.Table('bedrock_tokens')
+
+# Rough token estimation for different model families
+# These are approximations - more accurate measurement would require model-specific tokenizers
+def estimate_tokens(text, model_id):
+    if not text:
+        return 0
+        
+    # Default token estimation (words + punctuation)
+    # More accurate than character-based, still rough
+    words = re.findall(r'\w+', text)
+    punctuation = re.findall(r'[^\w\s]', text)
+    estimated_tokens = len(words) + len(punctuation)
+    
+    # Adjust based on model family
+    # Different models use different tokenization approaches
+    if 'claude' in model_id.lower():
+        # Claude models tend to use slightly fewer tokens
+        return int(estimated_tokens * 0.9)
+    elif 'llama' in model_id.lower():
+        # Llama models tokenization 
+        return int(estimated_tokens * 1.1)
+    else:
+        # Default for other models
+        return estimated_tokens
 
 def lambda_handler(event, context):
     # Set up CORS headers
@@ -32,7 +57,9 @@ def lambda_handler(event, context):
     
     start_time = time.time()
     customer_id = None
+    model_id = None
     token_count = 0
+    request_id = context.aws_request_id
     
     try:
         # Log the request (excluding sensitive data)
@@ -108,9 +135,7 @@ def lambda_handler(event, context):
         # Parse and return the response
         response_body = json.loads(response['body'].read().decode('utf-8'))
         
-        # Estimate token count (this is a very rough estimate)
-        # For accurate token counting, you'd need to use a proper tokenizer
-        # or extract token counts from model response if available
+        # Extract input and output text for token estimation
         input_text = ""
         if 'messages' in request_body:
             for msg in request_body['messages']:
@@ -130,21 +155,29 @@ def lambda_handler(event, context):
             elif isinstance(response_body['content'], str):
                 output_text += response_body['content']
         
-        # Very rough token estimate (approximately 4 chars per token)
-        input_tokens = len(input_text) // 4
-        output_tokens = len(output_text) // 4
+        # Use improved token estimation
+        input_tokens = estimate_tokens(input_text, model_id)
+        output_tokens = estimate_tokens(output_text, model_id)
         token_count = input_tokens + output_tokens
         
+        # Calculate duration in milliseconds
+        duration_ms = int((time.time() - start_time) * 1000)
+        
         # Log usage information for analytics
-        print(json.dumps({
+        # Format needed by the reporting-setup.yml CloudWatch query
+        log_entry = {
             "event_type": "bedrock_invoke",
             "customer_id": customer_id,
+            "request_id": request_id,
             "model_id": model_id,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
-            "total_tokens": token_count,
-            "duration_ms": int((time.time() - start_time) * 1000)
-        }))
+            "token_count": token_count,
+            "duration_ms": duration_ms,
+            "timestamp": int(time.time())
+        }
+        
+        print(json.dumps(log_entry))
         
         return {
             'statusCode': 200,
@@ -158,12 +191,16 @@ def lambda_handler(event, context):
         
         # Log error for analytics
         if customer_id:
-            print(json.dumps({
+            error_log = {
                 "event_type": "bedrock_error",
                 "customer_id": customer_id,
+                "model_id": model_id,
+                "request_id": request_id,
                 "error": error_message,
-                "duration_ms": int((time.time() - start_time) * 1000)
-            }))
+                "duration_ms": int((time.time() - start_time) * 1000),
+                "timestamp": int(time.time())
+            }
+            print(json.dumps(error_log))
         
         return {
             'statusCode': 500,
