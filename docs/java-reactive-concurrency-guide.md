@@ -25,14 +25,14 @@
 
 ## Java Concurrency vs Project Reactor: Method Comparison
 
-| Category                | Java Executors Method           | Project Reactor Schedulers Method    | Purpose                    | Thread Lifecycle                                                                               | Best For                                 |
-| ----------------------- | ------------------------------- | ------------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| **Fixed-size Pool**     | `newFixedThreadPool(n)`         | `parallel()`                         | Limited thread pool        | Java: Permanent until shutdown<br>Reactor: Permanent                                           | CPU-bound tasks, parallel processing     |
-| **Elastic Pool**        | `newCachedThreadPool()`         | `boundedElastic()`                   | Scalable thread pool       | Java: Unlimited growth, 60s idle timeout<br>Reactor: Bounded growth (CPU×10), 60s idle timeout | I/O operations, blocking calls           |
-| **Single Thread**       | `newSingleThreadExecutor()`     | `single()`                           | One worker thread          | Java: Permanent until shutdown<br>Reactor: Permanent                                           | Sequential execution, ordered operations |
-| **Immediate Execution** | N/A (would be direct execution) | `immediate()`                        | No thread switch           | N/A (current thread)                                                                           | Testing, avoiding context switches       |
-| **Timer**               | `newScheduledThreadPool(n)`     | `Schedulers.newParallel("timer", n)` | Delayed/periodic execution | Java: Permanent until shutdown<br>Reactor: Permanent                                           | Scheduling tasks, timeouts               |
-| **Custom**              | `new ThreadPoolExecutor(...)`   | `fromExecutorService(exec)`          | Custom configuration       | Depends on configuration                                                                       | Special threading requirements           |
+| Category                | Java Executors Method           | Project Reactor Schedulers Method | Purpose                    | Thread Lifecycle                                                                               | Best For                                 |
+| ----------------------- | ------------------------------- | --------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Fixed-size Pool**     | `newFixedThreadPool(n)`         | `parallel()`                      | Limited thread pool        | Java: Permanent until shutdown<br>Reactor: Permanent                                           | CPU-bound tasks, parallel processing     |
+| **Elastic Pool**        | `newCachedThreadPool()`         | `boundedElastic()`                | Scalable thread pool       | Java: Unlimited growth, 60s idle timeout<br>Reactor: Bounded growth (CPU×10), 60s idle timeout | I/O operations, blocking calls           |
+| **Single Thread**       | `newSingleThreadExecutor()`     | `single()`                        | One worker thread          | Java: Permanent until shutdown<br>Reactor: Permanent                                           | Sequential execution, ordered operations |
+| **Immediate Execution** | N/A (would be direct execution) | `immediate()`                     | No thread switch           | N/A (current thread)                                                                           | Testing, avoiding context switches       |
+| **Timer**               | `newScheduledThreadPool(n)`     | `newParallel("timer", n)`         | Delayed/periodic execution | Java: Permanent until shutdown<br>Reactor: Permanent                                           | Scheduling tasks, timeouts               |
+| **Custom**              | `new ThreadPoolExecutor(...)`   | `fromExecutorService(exec)`       | Custom configuration       | Depends on configuration                                                                       | Special threading requirements           |
 
 ## Usage Examples
 
