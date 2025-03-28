@@ -44,7 +44,7 @@ async function callBedrockNonStreaming(prompt) {
 }
 
 // 2. Streaming request with SSE from Lambda Function URL
-// Returns SSE format with "data: [END]" at completion
+// Returns SSE format with "data: [DONE]" at completion
 async function callBedrockSSEStreaming(prompt) {
   const apiEndpoint = 'https://your-lambda-function-url/bedrock';
   const authToken = 'your-customer-token-here';
@@ -79,7 +79,7 @@ async function callBedrockSSEStreaming(prompt) {
   }
   
   return response; // Return the streaming response
-  // Your app should handle SSE format with "data: [END]" at completion
+  // Your app should handle SSE format with "data: [DONE]" at completion
 }
 
 // 3. API Gateway streaming (chunked response)

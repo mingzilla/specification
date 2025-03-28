@@ -225,7 +225,7 @@ def lambda_handler(event, context):
                             yield f"data: {json.dumps({'content': text_content})}\n\n"
                     
                     # Send end signal
-                    yield "data: [END]\n\n"
+                    yield "data: [DONE]\n\n"
                     
                     # Log usage metrics after completion
                     output_tokens = estimate_tokens(output_text, model_id)

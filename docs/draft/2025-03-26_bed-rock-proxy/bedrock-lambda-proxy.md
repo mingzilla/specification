@@ -116,7 +116,7 @@ The Lambda proxy supports both streaming and non-streaming requests. To use stre
 
 1. Add `"stream": true` to your request JSON
 2. Handle the response format appropriate to your deployment method:
-   - Lambda Function URL: SSE format with `data: {"content": "chunk text"}\n\n` chunks and `data: [END]\n\n` as the end signal
+   - Lambda Function URL: SSE format with `data: {"content": "chunk text"}\n\n` chunks and `data: [DONE]\n\n` as the end signal
    - API Gateway: Array of chunks with objects like `{"content": "chunk text"}` and a final `{"done": true}` object
 
 For complete details on streaming implementation, see [bedrock-streaming-docs.md](bedrock-streaming-docs.md).

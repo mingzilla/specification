@@ -204,7 +204,7 @@ data: {
 }
 
 // Final termination signal
-data: [END]
+data: [DONE]
 ~~~
 
 #### Actual SSE Streaming Response Format (RPC compliant)
@@ -215,10 +215,10 @@ The actual SSE stream follows the SSE protocol with each message on a single lin
 data: {"message":{"role":"assistant","content":"I'm "},"done":false,"index":0}\n\n
 data: {"message":{"role":"assistant","content":"doing well"},"done":false,"index":1}\n\n
 data: {"message":{"role":"assistant","content":", thank you!"},"done":false,"index":2}\n\n
-data: [END]\n\n
+data: [DONE]\n\n
 ~~~
 
-The last chunk is a special `data: [END]\n\n` message to signal the end of the stream.
+The last chunk is a special `data: [DONE]\n\n` message to signal the end of the stream.
 
 ## Response Headers
 
@@ -278,7 +278,7 @@ For SSE streaming, errors use the standard SSE protocol's event type feature:
 ~~~
 event: error
 data: {"message":"Error message describing what went wrong","type":"error_type","code":"error_code"}\n\n
-data: [END]\n\n
+data: [DONE]\n\n
 ~~~
 
 This format is fully compliant with the SSE specification and will be automatically routed to error handlers in browser-based EventSource implementations.
@@ -327,7 +327,7 @@ curl -X POST http://your-api.example/chat/sse \
 const eventSource = new EventSource('/chat/sse');
 
 eventSource.onmessage = (event) => {
-  if (event.data === '[END]') {
+  if (event.data === '[DONE]') {
     console.log('Stream ended');
     eventSource.close(); // Close the connection
   } else {

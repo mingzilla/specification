@@ -48,7 +48,7 @@ Depending on deployment method, streaming responses come in two formats:
 When using Lambda Function URLs with streaming enabled, the response:
 - Has Content-Type: `text/event-stream`
 - Delivers chunks in Server-Sent Events format: `data: {"content": "chunk text"}\n\n`
-- Signals completion with: `data: [END]\n\n`
+- Signals completion with: `data: [DONE]\n\n`
 
 This format is ideal for real-time display of responses as they're generated.
 

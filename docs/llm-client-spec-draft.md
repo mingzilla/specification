@@ -311,7 +311,7 @@ public class LlmClient {
             .filter(line -> !line.isEmpty() && line.startsWith("data: "))
             .map(line -> {
                 String data = line.substring(6);  // Remove "data: " prefix
-                if ("[END]".equals(data)) {
+                if ("[DONE]".equals(data)) {
                     return ServerSentEvent.<LlmClientOutputChunk>builder()
                         .data(null)
                         .event("end")
@@ -567,7 +567,7 @@ public record ChatRequest(
 
 1. **Chunked Processing:** Properly handle line-delimited JSON in streams.
 
-2. **End Detection:** Correctly identify stream termination markers (`"done": true` or `data: [END]`).
+2. **End Detection:** Correctly identify stream termination markers (`"done": true` or `data: [DONE]`).
 
 3. **SSE Handling:** For SSE streams, use the appropriate WebClient methods and SSE decoder.
 
