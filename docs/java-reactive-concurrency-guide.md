@@ -74,6 +74,50 @@ Flux.range(1, 100)
     .subscribe();
 ```
 
+## Terminologies Comparison
+
+Here's a side-by-side comparison of Java Reactor and JavaScript RxJS equivalents:
+
+| Java (Project Reactor)                     | JavaScript (RxJS)                  | Purpose                                     |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------- |
+| `Mono`                                     | `Observable` (single value)        | Container for 0-1 async values              |
+| `Flux`                                     | `Observable` (multiple values)     | Container for 0-n async values              |
+| `Mono.fromCallable()`                      | `from(new Promise())` or `defer()` | Create observable from function call        |
+| `subscribeOn(Schedulers.boundedElastic())` | `observeOn(asyncScheduler)`        | Control which thread pool executes the work |
+| `subscribe(data -> process(data))`         | `subscribe(data => process(data))` | Terminal operation to start the chain       |
+| `Schedulers.boundedElastic()`              | `asyncScheduler`                   | Thread pool for I/O operations              |
+| `Schedulers.parallel()`                    | `queueScheduler`                   | Thread pool for CPU-bound work              |
+
+Complete example conversion:
+
+```java
+// Java - Project Reactor
+Mono.fromCallable(() -> blockingDatabaseCall())
+    .subscribeOn(Schedulers.boundedElastic())
+    .subscribe(data -> process(data));
+```
+
+```javascript
+// JavaScript (RxJS)
+import { defer, from, observeOn, asyncScheduler } from 'rxjs';
+defer(() => from(blockingDatabaseCall())) // from: Similar to `Observable.from()`
+    .pipe(observeOn(asyncScheduler))
+    .subscribe(data => process(data));
+```
+
+Here's the RxJS comparison with the WHAT values filled in:
+
+| Component         | RxJS Code                                                       | What it is                                                                           |
+| ----------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Source creator    | `defer(() => from(blockingDatabaseCall()))`                     | Creates a lazy observable that runs `blockingDatabaseCall()` only when subscribed to |
+| Operator          | `from(fetch('/api/data')).subscribe(resp => console.log(resp))` | from - async - converts promises into observables                                    |
+| Operator          | `from([1, 2, 3]).subscribe(num => console.log(num))`            | from - sync - converts arrays into Observables that emit each array element          |
+| Operator          | `Observable.pipe(observeOn(asyncScheduler))`                    | Pipe method to apply operators to the observable                                     |
+| Thread management | `observeOn(asyncScheduler)`                                     | Controls which scheduler/thread processes emissions                                  |
+| Thread pool       | `asyncScheduler`                                                | RxJS's asynchronous scheduler, an optimised `setTimeout()`                           |
+| Consumer          | `subscribe(data => process(data))`                              | Terminal operation that starts the observable chain                                  |
+
+
 ## Key Differences
 
 1. **Resource Management**: 
@@ -116,7 +160,7 @@ Flux.range(1, 100)
 | [map] --> [publishOn(parallel)] --> [filter]        |
 |                   |                    |            |
 |                   v                    v            |
-|            Only downstream ops run on parallel thread|
+|           Only downstream ops run on parallel thread|
 +-----------------------------------------------------+
 ```
 
