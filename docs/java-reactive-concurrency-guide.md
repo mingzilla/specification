@@ -173,43 +173,39 @@ Here's the RxJS comparison with the WHAT values filled in:
 | **UI Thread Management**  | `uiEventFlux`<br>`.publishOn(Schedulers.single())`<br>`.map(this::processEvent)`<br>`.publishOn(Schedulers.fromExecutor(uiExecutor))`                                               | Processes on background thread, publishes results on UI thread | Desktop/mobile applications                  |
 | **Mixed Threading Model** | `Flux.range(1, 100)`<br>`.publishOn(Schedulers.parallel())`<br>`.map(this::heavyComputation)`<br>`.publishOn(Schedulers.boundedElastic())`<br>`.flatMap(id -> externalApiCall(id))` | Uses appropriate scheduler for each operation type             | Complex processing pipelines                 |
 
-## Thread Scheduling in LlmClient.java
+## Parallel Execution
+If you need to execute parallel database calls and combine their results. Here's how to do this with Project Reactor:
 
 ```java
-// From llm-client-java.md
-public Flux<LlmClientOutputChunk> handleStream(Supplier<LlmClientInput> inputSupplier) {
-    return Mono.fromCallable(inputSupplier::get)
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(this::stream);
-}
+// Define your two blocking database calls
+Mono<DataA> callA = Mono.fromCallable(() -> blockingDatabaseCallA())
+    .subscribeOn(Schedulers.boundedElastic());
+
+Mono<DataB> callB = Mono.fromCallable(() -> blockingDatabaseCallB())
+    .subscribeOn(Schedulers.boundedElastic());
+
+// Combine both results using zip
+Mono<Tuple2<DataA, DataB>> combined = Mono.zip(callA, callB);
+
+// Process the combined results
+Flux<Result> results = combined.flatMapMany(tuple -> {
+    DataA resultA = tuple.getT1();
+    DataB resultB = tuple.getT2();
+    return process(resultA, resultB);
+});
+
+// Subscribe to start the flow
+results.subscribe(
+    result -> System.out.println("Processed: " + result),
+    error -> error.printStackTrace(),
+    () -> System.out.println("Processing complete")
+);
 ```
 
-This code demonstrates proper reactive handling of potentially blocking operations:
+Key points:
+- Each database call gets its own `subscribeOn(Schedulers.boundedElastic())`, allowing them to run on separate threads
+- `Mono.zip()` waits for both operations to complete before continuing
+- The results are accessible as a tuple with `getT1()` and `getT2()`
+- For more than two operations, you can use `Mono.zip(mono1, mono2, mono3, ...)` or `Flux.zip()`
 
-1. `Mono.fromCallable(inputSupplier::get)` - Creates a Mono that executes the supplier function when subscribed to
-2. `.subscribeOn(Schedulers.boundedElastic())` - Moves execution to boundedElastic thread pool to handle potentially blocking operations
-3. `.flatMapMany(this::stream)` - Once input is obtained, transforms to a stream of chunks
-
-The `.subscribeOn(Schedulers.boundedElastic())` specifically:
-- Ensures that any blocking code in the inputSupplier won't block reactive threads
-- Uses boundedElastic which is designed for I/O operations
-- Demonstrates the pattern of isolating blocking code in reactive applications
-
-## Key Concepts
-
-1. **subscribeOn** - Controls where the **subscription** happens and affects the entire upstream chain:
-   - Only the first `subscribeOn()` in the chain has an effect
-   - Used to move blocking operations off reactive threads
-
-2. **publishOn** - Controls where **operators after it** execute:
-   - Each `publishOn()` affects only downstream operators
-   - Can be used multiple times to switch execution contexts
-
-3. **subscribe** - The terminal operation that:
-   - Starts the actual data flow (lazy execution model)
-   - Takes three optional callbacks: `onNext`, `onError`, `onComplete`
-   - Returns a `Disposable` that can be used to cancel the subscription
-
-4. **Thread Switching Cost** - Changing threads has overhead:
-   - Only use `subscribeOn`/`publishOn` when necessary
-   - Group operations that can run on the same thread
+The operations will execute in parallel, potentially improving performance compared to sequential execution.
