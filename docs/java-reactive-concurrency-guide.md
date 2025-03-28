@@ -3,24 +3,24 @@
 ## Java Concurrent Framework vs Project Reactor Overview
 
 ```
-+------------------------------------+    +------------------------------------+
-|       java.util.concurrent         |    |         Project Reactor            |
-+------------------------------------+    +------------------------------------+
-|                                    |    |                                    |
-|  +-------------+  +-------------+  |    |  +-------------+  +-------------+  |
-|  |  Executors  |  |ExecutorSvc  |  |    |  | Schedulers  |  | Scheduler   |  |
-|  |-------------|  |-------------|  |    |  |-------------|  |-------------|  |
-|  | Factory     |  | Interface   |  |    |  | Factory     |  | Interface   |  |
-|  | methods to  |  | for thread  |  |    |  | methods for |  | for async   |  |
-|  | create      |  | pool mgmt   |  |    |  | scheduler   |  | execution   |  |
-|  | thread pools|  |             |  |    |  | instances   |  | in streams  |  |
-|  +-------------+  +-------------+  |    |  +-------------+  +-------------+  |
-|                                    |    |                                    |
-+------------------------------------+    +------------------------------------+
-              |                                          ^
-              |                                          |
-              +------------------------------------------+
-                        Built on top of / Extends
++--------------------------------------+    +------------------------------------+
+|        java.util.concurrent          |    |         Project Reactor            |
++--------------------------------------+    +------------------------------------+
+|                                      |    |                                    |
+|  +-------------+  +---------------+  |    |  +-------------+  +-------------+  |
+|  |  Executors  |  |ExecutorService|  |    |  | Schedulers  |  | Scheduler   |  |
+|  |-------------|  |---------------|  |    |  |-------------|  |-------------|  |
+|  | Factory     |  | Interface     |  |    |  | Factory     |  | Interface   |  |
+|  | methods to  |  | for thread    |  |    |  | methods for |  | for async   |  |
+|  | create      |  | pool mgmt     |  |    |  | scheduler   |  | execution   |  |
+|  | thread pools|  |               |  |    |  | instances   |  | in streams  |  |
+|  +-------------+  +---------------+  |    |  +-------------+  +-------------+  |
+|                                      |    |                                    |
++--------------------------------------+    +------------------------------------+
+                  |                                          ^
+                  |                                          |
+                  +------------------------------------------+
+                            Built on top of / Extends
 ```
 
 ## Java Concurrency vs Project Reactor: Method Comparison
