@@ -149,31 +149,59 @@ The core concepts are the same in both frameworks - you create streams (Observab
 
 ## Conversion Operators
 
-| Situation   | Operator      | Result |
-| ----------- | ------------- | ------ |
-| Mono → Flux | flatMapMany   | Flux   |
-| Flux → Mono | collectList() | Mono   |
-| Flux → Mono | reduce()      | Mono   |
+| **Operator**        | **Input Type**  |     | **Output Type** | **Description**                                                                                                    |
+| ------------------- | --------------- | --- | --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **`flatMap`**       | `Flux<Mono<T>>` | →   | `Flux<T>`       | Flattens each `Mono` emitted by the `Flux` into a single stream of `T`.                                            |
+| **`flatMapMany`**   | `Mono<Flux<T>>` | →   | `Flux<T>`       | Flattens the `Flux` inside the `Mono`, emitting each item in the flattened `Flux`.                                 |
+| **`flatMapMany`**   | `Mono<T>`       | →   | `Flux<T>`       | Flattens the `Flux` inside the `Mono`, emitting each item in the flattened `Flux`.                                 |
+| **`collectList()`** | `Flux<T>`       | →   | `Mono<List<T>>` | Collects all items emitted by the `Flux` into a `List<T>` and emits it as a single `Mono<List<T>>`.                |
+| **`reduce()`**      | `Flux<T>`       | →   | `Mono<T>`       | Reduces the items emitted by the `Flux` into a single value of type `T` by applying a binary accumulator function. |
 
-### Usage Example
+---
 
-```java
-// Mono -> Flux
-Mono.fromCallable(inputSupplier::get)
-    .subscribeOn(Schedulers.boundedElastic())
-    .flatMapMany(input -> {
-        return webClient.post().uri(input.url()).retrieve()
-            .bodyToFlux(String.class)
-            // ... rest of Flux operators
-    })
+### **Detailed Example of Each:**
 
-// Flux -> Mono: collectList()
-Mono<List<Integer>> monoList = Flux.just(1, 2, 3, 4, 5).collectList();
+1. **`flatMap` Example:**
+   ```java
+   Flux.just(1, 2, 3)
+       .flatMap(x -> Mono.just(x * 2))  // `Mono<Integer>` for each item
+       .subscribe(System.out::println);  // Outputs: 2, 4, 6
+   ```
+   - Transforms `Flux<Mono<Integer>>` into `Flux<Integer>` by flattening.
 
-// Flux -> Mono: reduce()
-Mono<Integer> sumMono = Flux.just(1, 2, 3, 4, 5).reduce(0, (acc, next) -> acc + next);
+2. **`flatMapMany` Example:**
+   ```java
+   Mono.just(Flux.just(1, 2, 3))
+       .flatMapMany(flux -> flux)  // Flattens `Flux` inside the `Mono`
+       .subscribe(System.out::println);  // Outputs: 1, 2, 3
+   ```
+   - Transforms `Mono<Flux<T>>` into `Flux<T>` by extracting and flattening the `Flux`.
 
-```
+3. **`flatMapMany` Example:**
+   ```java
+   Mono.just(List.of(1, 2, 3, 4))
+       .flatMapMany(List<Integer> list -> { // Or just `.flatMapMany(Flux::fromIterable)`
+           return Flux.fromIterable(list);
+       })  // Flattens the list into individual elements
+       .subscribe(System.out::println);  // Output: 1, 2, 3, 4
+   ```
+   - Transforms `Mono<List<Object>>` to `Flux<Object>`.
+
+4. **`collectList()` Example:**
+   ```java
+   Flux.just(1, 2, 3)
+       .collectList()
+       .subscribe(System.out::println);  // Outputs: [1, 2, 3]
+   ```
+   - Collects the items from `Flux<Integer>` and emits them as `Mono<List<Integer>>`.
+
+5. **`reduce()` Example:**
+   ```java
+   Flux.just(1, 2, 3)
+       .reduce((a, b) -> a + b)  // Reduces the sequence by summing
+       .subscribe(System.out::println);  // Outputs: 6
+   ```
+   - Applies the reduction function (e.g., summing) and emits a single value as `Mono<T>`.
 
 ----
 
