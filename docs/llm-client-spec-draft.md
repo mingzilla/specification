@@ -225,6 +225,8 @@ public record LlmClientInput(String url, String body,
      */
     public static LlmClientInput chat(String url, LlmClientInputBody inputBody, 
                                     Map<String, String> headers) { /* ... */ }
+
+    public void setHeaders(HttpHeaders headers) { /* ... */ }
 }
 ```
 
@@ -265,7 +267,7 @@ public class LlmClient {
         return webClient.post()
             .uri(input.url())
             .bodyValue(input.body())
-            .headers(headers -> headers.putAll(input.headers()))
+            .headers(input::setHeaders)
             .retrieve()
             .bodyToMono(String.class)
             .map(this::parseResponse)
@@ -285,7 +287,7 @@ public class LlmClient {
         return webClient.post()
             .uri(input.url())
             .bodyValue(input.body())
-            .headers(headers -> headers.putAll(input.headers()))
+            .headers(input::setHeaders)
             .retrieve()
             .bodyToFlux(String.class)
             .filter(line -> !line.isEmpty())
@@ -301,28 +303,27 @@ public class LlmClient {
      * @param input The LlmClientInput containing the request details
      * @return A Flux that emits each SSE event from the streaming response
      */
-    private Flux<ServerSentEvent<LlmClientOutputChunk>> streamSse(LlmClientInput input) {
+    private Flux<ServerSentEvent<?>> streamSse(LlmClientInput input) {
         return webClient.post()
             .uri(input.url())
             .bodyValue(input.body())
             .headers(headers -> headers.putAll(input.headers()))
             .retrieve()
             .bodyToFlux(String.class)
-            .filter(line -> !line.isEmpty() && line.startsWith("data: "))
+            .filter(line -> !line.isEmpty())
             .map(line -> {
-                String data = line.substring(6);  // Remove "data: " prefix
+                String data = line.startsWith("data: ") ? line.substring(6) : line;
                 if ("[DONE]".equals(data)) {
-                    return ServerSentEvent.<LlmClientOutputChunk>builder()
-                        .data(null)
-                        .event("end")
-                        .build();
+                    return ServerSentEvent.<String>builder()
+                            .data("[DONE]")
+                            .build();
                 } else {
                     return ServerSentEvent.<LlmClientOutputChunk>builder()
-                        .data(parseChunk(data))
-                        .build();
+                            .data(LlmClientJsonUtil.parseStreamChunk(data))
+                            .build();
                 }
             })
-            .takeUntil(event -> "end".equals(event.event()));
+            .takeUntil(event -> event.data() != null && "[DONE]".equals(event.data()));
     }
     
     /**
@@ -358,7 +359,7 @@ public class LlmClient {
      * @param inputSupplier A supplier function that provides the LlmClientInput, may contain blocking code
      * @return A Flux that emits each SSE event from the streaming response
      */
-    public Flux<ServerSentEvent<LlmClientOutputChunk>> handleStreamSse(Supplier<LlmClientInput> inputSupplier) {
+    public Flux<ServerSentEvent<?>> handleStreamSse(Supplier<LlmClientInput> inputSupplier) {
         return Mono.fromCallable(inputSupplier::get)
             .subscribeOn(Schedulers.boundedElastic())
             .flatMapMany(this::streamSse);
@@ -501,7 +502,7 @@ public class ChatController {
      * Use for Server-Sent Events streaming
      */
     @PostMapping(value = "/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<LlmClientOutputChunk>> sse(@RequestBody ChatRequest request) {
+    public Flux<ServerSentEvent<?>> sse(@RequestBody ChatRequest request) {
         return llmClient.handleStreamSse(() -> {
             // All blocking code including database queries can safely go here
             ConversationHistory history = conversationRepository.findLatestByUserId(request.getUserId());
