@@ -98,58 +98,58 @@ mono.subscribe(
 
 ### 2. Basic Transformations
 
-| RxJS (Angular) | Spring WebFlux/Reactor | Description                                             |
-| -------------- | ---------------------- | ------------------------------------------------------- |
-| map()          | map()                  | Transform each element in the stream                    |
-| filter()       | filter()               | Keep only elements matching a predicate                 |
-| mergeMap()     | flatMap()              | Transform each element into a new stream and flatten    |
-| zip()          | zip()                  | Combine emissions by matching index/arrival time        |
-| of()           | just()                 | Create streams from direct values                       |
-| from()         | fromIterable()         | Create streams from collections or other reactive types |
-| takeUntil()    | takeUntil()            | Take elements until another stream emits                |
+| RxJS (Angular) | Spring WebFlux/Reactor | Description                                             | Example                                                                                                                                                        |
+| -------------- | ---------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| map()          | map()                  | Transform each element in the stream                    | RxJS: `of(1, 2, 3).pipe(map(x => x * 2))` // 2, 4, 6<br>Reactor: `Flux.just(1, 2, 3).map(x -> x * 2)`                                                          |
+| filter()       | filter()               | Keep only elements matching a predicate                 | RxJS: `of(1, 2, 3, 4).pipe(filter(x => x % 2 === 0))` // 2, 4<br>Reactor: `Flux.just(1, 2, 3, 4).filter(x -> x % 2 == 0)`                                      |
+| mergeMap()     | flatMap()              | Transform each element into a new stream and flatten    | RxJS: `of(1, 2).pipe(mergeMap(x => of(x, x+1)))` // 1, 2, 2, 3<br>Reactor: `Flux.just(1, 2).flatMap(x -> Flux.just(x, x+1))`                                   |
+| zip()          | zip()                  | Combine emissions by matching index/arrival time        | RxJS: `zip(of('a', 'b'), of(1, 2))` // ['a',1], ['b',2]<br>Reactor: `Flux.zip(Flux.just("a", "b"), Flux.just(1, 2))`                                           |
+| of()           | just()                 | Create streams from direct values                       | RxJS: `of(1, 2, 3)` // emits: 1, 2, 3<br>Reactor: `Flux.just(1, 2, 3)`                                                                                         |
+| from()         | fromIterable()         | Create streams from collections or other reactive types | RxJS: `from([1, 2, 3])` // 1, 2, 3<br>Reactor: `Flux.fromIterable(Arrays.asList(1, 2, 3))`                                                                     |
+| takeUntil()    | takeUntil()            | Take elements until another stream emits                | RxJS: `interval(100).pipe(takeUntil(timer(500)))` // 0,1,2,3<br>Reactor: `Flux.interval(Duration.ofMillis(100)).takeUntil(Flux.timer(Duration.ofMillis(500)))` |
 
 ### 3. Flow Control Operations
 
-| RxJS (Angular)  | Spring WebFlux/Reactor         | Description                                                                               |
-| --------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
-| switchMap()     | switchMap()                    | Cancel previous inner streams when a new one arrives                                      |
-| combineLatest() | combineLatest()                | Combine latest values whenever any source emits                                           |
-| concat()        | concat()                       | Append one stream after another sequentially                                              |
-| merge()         | merge()                        | Combine streams as elements arrive (interleaved)                                          |
-| N/A             | flatMap() on Flux<Mono<T>>     | Flattens each Mono emitted by the Flux into a single stream of T                          |
-| N/A             | flatMapMany() on Mono<Flux<T>> | Flattens the Flux inside the Mono, emitting each item in the flattened Flux               |
-| N/A             | flatMapMany() on Mono<T>       | Transforms the value into a Flux                                                          |
-| N/A             | collectList() on Flux<T>       | Collects all items emitted by the Flux into a Mono<List<T>>                               |
-| reduce()        | reduce() on Flux<T>            | Reduces the items emitted by the Flux into a single Mono<T> using an accumulator function |
+| RxJS (Angular)  | Spring WebFlux/Reactor         | Description                                                                               | Example                                                                                                                                                                                                                                             |
+| --------------- | ------------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| switchMap()     | switchMap()                    | Cancel previous inner streams when a new one arrives                                      | RxJS: `clicks$.pipe(switchMap(() => interval(500)))` // Restarts interval on each click<br>Reactor: `clickFlux.switchMap(click -> Flux.interval(Duration.ofMillis(500)))`                                                                           |
+| combineLatest() | combineLatest()                | Combine latest values whenever any source emits                                           | RxJS: `combineLatest([a$, b$], (a, b) => a + b)` // Sum of latest values<br>Reactor: `Flux.combineLatest(fluxA, fluxB, (a, b) -> a + b)`                                                                                                            |
+| concat()        | concat()                       | Append one stream after another sequentially                                              | RxJS: `concat(of(1, 2), of(3, 4))` // 1,2,3,4<br>Reactor: `Flux.concat(Flux.just(1, 2), Flux.just(3, 4))`                                                                                                                                           |
+| merge()         | merge()                        | Combine streams as elements arrive (interleaved)                                          | RxJS: `merge(interval(500).pipe(map(() => 'A')), interval(300).pipe(map(() => 'B')))` // Interleaved A's and B's<br>Reactor: `Flux.merge(Flux.interval(Duration.ofMillis(500)).map(i -> "A"), Flux.interval(Duration.ofMillis(300)).map(i -> "B"))` |
+| N/A             | flatMap() on Flux<Mono<T>>     | Flattens each Mono emitted by the Flux into a single stream of T                          | Reactor: `Flux.just(Mono.just("a"), Mono.just("b")).flatMap(mono -> mono)` // "a", "b"                                                                                                                                                              |
+| N/A             | flatMapMany() on Mono<Flux<T>> | Flattens the Flux inside the Mono, emitting each item in the flattened Flux               | Reactor: `Mono.just(Flux.just("a", "b")).flatMapMany(flux -> flux)` // "a", "b"                                                                                                                                                                     |
+| N/A             | flatMapMany() on Mono<T>       | Transforms the value into a Flux                                                          | Reactor: `Mono.just("a").flatMapMany(a -> Flux.just(a, a + a))` // "a", "aa"                                                                                                                                                                        |
+| N/A             | collectList() on Flux<T>       | Collects all items emitted by the Flux into a Mono<List<T>>                               | Reactor: `Flux.just(1, 2, 3).collectList()` // Mono<List<Integer>> containing [1, 2, 3]                                                                                                                                                             |
+| reduce()        | reduce() on Flux<T>            | Reduces the items emitted by the Flux into a single Mono<T> using an accumulator function | RxJS: `of(1, 2, 3).pipe(reduce((acc, val) => acc + val, 0))` // 6<br>Reactor: `Flux.just(1, 2, 3).reduce(0, (acc, val) -> acc + val)` // Mono<Integer> containing 6                                                                                 |
 
 ### 4. Timing and Rate Management
 
-| RxJS (Angular) | Spring WebFlux/Reactor | Description                                                |
-| -------------- | ---------------------- | ---------------------------------------------------------- |
-| debounceTime() | debounce()             | Wait for quiet period before emitting most recent value    |
-| delay()        | delayElements()        | Delay emissions by a specified amount of time              |
-| throttleTime() | limitRate()            | Limit the rate of emissions                                |
-| interval()     | interval()             | Create a stream that emits sequential numbers periodically |
-| timeout()      | timeout()              | Error if no emission within specified duration             |
+| RxJS (Angular) | Spring WebFlux/Reactor | Description                                                | Example                                                                                                                                                         |
+| -------------- | ---------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| debounceTime() | debounce()             | Wait for quiet period before emitting most recent value    | RxJS: `searchInput$.pipe(debounceTime(300))` // Only emit after 300ms of inactivity<br>Reactor: `searchInputFlux.debounce(Duration.ofMillis(300))`              |
+| delay()        | delayElements()        | Delay emissions by a specified amount of time              | RxJS: `of(1, 2, 3).pipe(delay(1000))` // Emit after 1s delay<br>Reactor: `Flux.just(1, 2, 3).delayElements(Duration.ofSeconds(1))`                              |
+| throttleTime() | limitRate()            | Limit the rate of emissions                                | RxJS: `clicks$.pipe(throttleTime(1000))` // Max 1 click per second<br>Reactor: `clicksFlux.limitRate(10)` // Request max 10 at a time                           |
+| interval()     | interval()             | Create a stream that emits sequential numbers periodically | RxJS: `interval(1000)` // Emit 0,1,2,... every 1s<br>Reactor: `Flux.interval(Duration.ofSeconds(1))`                                                            |
+| timeout()      | timeout()              | Error if no emission within specified duration             | RxJS: `of(1).pipe(delay(2000), timeout(1000))` // Error after 1s<br>Reactor: `Flux.just(1).delayElements(Duration.ofSeconds(2)).timeout(Duration.ofSeconds(1))` |
 
 ### 5. Error Handling
 
-| RxJS (Angular)      | Spring WebFlux/Reactor | Description                                              |
-| ------------------- | ---------------------- | -------------------------------------------------------- |
-| catchError()        | onErrorResume()        | Catch errors and provide fallback logic                  |
-| retry()             | retry()                | Resubscribe to the source after an error occurs          |
-| onErrorResumeNext() | onErrorComplete()      | Continue with next observable when error occurs          |
-| finalize()          | doFinally()            | Perform action when stream completes, errors, or cancels |
+| RxJS (Angular)      | Spring WebFlux/Reactor | Description                                              | Example                                                                                                                                                   |
+| ------------------- | ---------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| catchError()        | onErrorResume()        | Catch errors and provide fallback logic                  | RxJS: `obs$.pipe(catchError(err => of('fallback')))` // Return fallback on error<br>Reactor: `flux.onErrorResume(e -> Flux.just("fallback"))`             |
+| retry()             | retry()                | Resubscribe to the source after an error occurs          | RxJS: `http$.pipe(retry(3))` // Retry failed request 3 times<br>Reactor: `webClient.get().uri("/api").retrieve().bodyToMono(String.class).retry(3)`       |
+| onErrorResumeNext() | onErrorComplete()      | Continue with next observable when error occurs          | RxJS: `onErrorResumeNext([a$, b$])` // If a$ fails, switch to b$<br>Reactor: `fluxA.onErrorComplete().concatWith(fluxB)`                                  |
+| finalize()          | doFinally()            | Perform action when stream completes, errors, or cancels | RxJS: `obs$.pipe(finalize(() => console.log('Done')))` // Log when finished<br>Reactor: `flux.doFinally(signal -> System.out.println("Done: " + signal))` |
 
 ### 6. Utility Operations
 
-| RxJS (Angular)         | Spring WebFlux/Reactor | Description                                            |
-| ---------------------- | ---------------------- | ------------------------------------------------------ |
-| tap()                  | doOnNext()             | Perform side effects without modifying the stream      |
-| distinctUntilChanged() | distinctUntilChanged() | Emit only when value changes from previous             |
-| share()                | share()                | Share a single subscription among multiple subscribers |
-| startWith()            | startWith()            | Prepend values to the beginning of a stream            |
-| scan()                 | scan()                 | Apply accumulator function to each value (like reduce) |
+| RxJS (Angular)         | Spring WebFlux/Reactor | Description                                            | Example                                                                                                                                                                                          |
+| ---------------------- | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| tap()                  | doOnNext()             | Perform side effects without modifying the stream      | RxJS: `of(1, 2, 3).pipe(tap(x => console.log(x)))` // Log values as they emit<br>Reactor: `Flux.just(1, 2, 3).doOnNext(x -> System.out.println(x))`                                              |
+| distinctUntilChanged() | distinctUntilChanged() | Emit only when value changes from previous             | RxJS: `of(1, 1, 2, 2, 3).pipe(distinctUntilChanged())` // 1,2,3<br>Reactor: `Flux.just(1, 1, 2, 2, 3).distinctUntilChanged()`                                                                    |
+| share()                | share()                | Share a single subscription among multiple subscribers | RxJS: `const shared$ = http$.pipe(share())` // Multiple subscribers share one HTTP call<br>Reactor: `Flux<Data> shared = webClient.get().uri("/data").retrieve().bodyToFlux(Data.class).share()` |
+| startWith()            | startWith()            | Prepend values to the beginning of a stream            | RxJS: `of(3, 4).pipe(startWith(1, 2))` // 1,2,3,4<br>Reactor: `Flux.just(3, 4).startWith(1, 2)`                                                                                                  |
+| scan()                 | scan()                 | Apply accumulator function to each value (like reduce) | RxJS: `of(1, 2, 3).pipe(scan((acc, val) => acc + val, 0))` // 1,3,6<br>Reactor: `Flux.just(1, 2, 3).scan(0, (acc, val) -> acc + val)` // 1,3,6                                                   |
 
 ### 7. Concurrency Management
 
