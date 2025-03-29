@@ -209,3 +209,14 @@ Key points:
 - For more than two operations, you can use `Mono.zip(mono1, mono2, mono3, ...)` or `Flux.zip()`
 
 The operations will execute in parallel, potentially improving performance compared to sequential execution.
+
+## Parallel Execution Approaches Comparison
+
+| Aspect                        | Approach 1: `parallel()` with `Schedulers.parallel()`                                               | Approach 2: Multiple `Mono`s with `Schedulers.boundedElastic()`                         |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Best for**                  | CPU-bound operations (computation)                                                                  | I/O-bound operations (waiting)                                                          |
+| **Use cases**                 | • Pure computational tasks<br>• Math operations<br>• Data transformations<br>• In-memory processing | • Database calls<br>• Network requests<br>• File operations<br>• External service calls |
+| **Scheduler characteristics** | • Fixed-size pool based on CPU cores<br>• Optimized for computation                                 | • Dynamically sized, bounded pool<br>• Intelligent queuing with backpressure            |
+| **Execution model**           | • Splits work across threads<br>• True parallel computation                                         | • Each task runs independently<br>• Concurrent, not necessarily parallel                |
+| **Resource usage**            | • Higher CPU utilization<br>• Lower thread count                                                    | • Lower CPU utilization<br>• Higher thread count (but controlled)                       |
+| **Code pattern**              | `Flux.range().parallel().runOn().map().sequential()`                                                | `Mono.zip(taskA, taskB).flatMap(results -> process(results))`                           |
