@@ -1,56 +1,22 @@
 # RxJS and Spring WebFlux/Reactor Comparison
 This document shows how Spring WebFlux works.
 
-## Operator and Concept Comparison
+## Operator and Concept Comparison Simplified
 
-| RxJS (Angular)                     | Spring WebFlux/Reactor | Description                                             |
-| ---------------------------------- | ---------------------- | ------------------------------------------------------- |
-| Observable<T>                      | Flux<T>                | Stream that can emit 0-N elements                       |
-| Observable<T> with single emission | Mono<T>                | Stream that emits exactly 0-1 elements                  |
-| Subscriber                         | Subscriber             | Entity that receives and processes stream events        |
-| subscribe()                        | subscribe()            | Method to begin receiving events from a stream          |
-| map()                              | map()                  | Transform each element in the stream                    |
-| filter()                           | filter()               | Keep only elements matching a predicate                 |
-| mergeMap()                         | flatMap()              | Transform each element into a new stream and flatten    |
-| switchMap()                        | switchMap()            | Cancel previous inner streams when a new one arrives    |
-| combineLatest()                    | combineLatest()        | Combine latest values whenever any source emits         |
-| zip()                              | zip()                  | Combine emissions by matching index/arrival time        |
-| concat()                           | concat()               | Append one stream after another sequentially            |
-| merge()                            | merge()                | Combine streams as elements arrive (interleaved)        |
-| debounceTime()                     | debounce()             | Wait for quiet period before emitting most recent value |
-| delay()                            | delayElements()        | Delay emissions by a specified amount of time           |
-| catchError()                       | onErrorResume()        | Catch errors and provide fallback logic                 |
-| tap()                              | doOnNext()             | Perform side effects without modifying the stream       |
-| of(), from()                       | just(), fromIterable() | Create streams from values or collections               |
-| takeUntil()                        | takeUntil()            | Take elements until another stream emits                |
-| throttleTime()                     | limitRate()            | Limit the rate of emissions                             |
-| distinctUntilChanged()             | distinctUntilChanged() | Emit only when value changes from previous              |
-
-## Source/Subject Comparison
-
-| RxJS (Angular)         | Spring WebFlux/Reactor         | Description                                              |
-| ---------------------- | ------------------------------ | -------------------------------------------------------- |
-| Subject                | Sinks.many()                   | Basic subject without initial value                      |
-| BehaviorSubject        | Sinks.many().replay(1)         | Subject that replays the latest value to new subscribers |
-| ReplaySubject          | Sinks.many().replay(n)         | Subject that replays n values to new subscribers         |
-| AsyncSubject           | Sinks.one()                    | Subject that emits only the last value upon completion   |
-| subject.next(value)    | sink.tryEmitNext(value)        | Push a new value into the stream                         |
-| subject.error(err)     | sink.tryEmitError(err)         | Push an error into the stream                            |
-| subject.complete()     | sink.tryEmitComplete()         | Signal stream completion                                 |
-| subject.asObservable() | sink.asFlux() or sink.asMono() | Get a "read-only" stream from the subject                |
+| RxJS (Angular)      | Code                                        | Spring WebFlux/Reactor    | Code                                                                        |
+| ------------------- | ------------------------------------------- | ------------------------- | --------------------------------------------------------------------------- |
+| Subject             | `const subject = new Subject<string>('hi')` | Sinks.many() / Sink.one() | `Sinks.Many<String> sink = Sinks.many().multicast().onBackpressureBuffer()` |
+| Observable<T>       | `const observable = subject.asObservable()` | Flux<T> / Mono<T>         | `Flux<String> flux = sink.asFlux()`                                         |
+| subscribe()         | `observable.subscribe(goodFn, badFn)`       | subscribe()               | `flux.subscribe(goodFn, badFn)`                                             |
+| subject.next(value) | `subject.next('hi')`                        | sink.tryEmitNext(value)   | `sink.tryEmitNext("hi")`                                                    |
 
 ## Code Examples
 
 ### RxJS (Angular)
 
 ```typescript
-// Create a source of events
 const subject = new BehaviorSubject<string>('initial value');
-
-// Get a read-only stream to subscribe to
 const observable = subject.asObservable();
-
-// Subscribe to the stream
 observable.subscribe(
   data => console.log('Received:', data),
   error => console.error('Error:', error),
@@ -66,13 +32,8 @@ subject.complete();
 ### Spring WebFlux/Reactor - Flux Example
 
 ```java
-// Create a source of events
 Sinks.Many<String> sink = Sinks.many().multicast().onBackpressureBuffer();
-
-// Get a read-only stream to subscribe to
 Flux<String> flux = sink.asFlux();
-
-// Subscribe to the stream
 flux.subscribe(
   data -> System.out.println("Received: " + data),
   error -> System.err.println("Error: " + error),
@@ -88,13 +49,8 @@ sink.tryEmitComplete();
 ### Spring WebFlux/Reactor - Mono Example
 
 ```java
-// Create a one-time emitter sink
 Sinks.One<String> sink = Sinks.one();
-
-// Get a read-only Mono to subscribe to
 Mono<String> mono = sink.asMono();
-
-// Subscribe to the Mono
 mono.subscribe(
   data -> System.out.println("Received: " + data),
   error -> System.err.println("Error: " + error),
@@ -103,19 +59,15 @@ mono.subscribe(
 
 // Emit a single value (can only be done successfully once)
 sink.tryEmitValue("single value");
-
 // Alternative ways to complete the Mono:
-// sink.tryEmitEmpty(); // Complete without a value
-// sink.tryEmitError(new RuntimeException("Something went wrong")); // Emit an error
+sink.tryEmitEmpty(); // Complete without a value
+sink.tryEmitError(new RuntimeException("Something went wrong")); // Emit an error
 ```
 
 If you already have a value, and you want it to be merged into the reactive flow:
 
 ```java
-// Create a Mono with an immediately available value
 Mono<String> mono = Mono.just("static value");
-
-// Subscribe to it
 mono.subscribe(
     data -> System.out.println("Received: " + data),
     error -> System.err.println("Error: " + error),
@@ -123,7 +75,91 @@ mono.subscribe(
 );
 ```
 
-The core concepts are the same in both frameworks - you create streams (Observables/Flux/Mono), transform them with operators, and subscribe to receive the results. Both frameworks handle the asynchronous processing and event propagation behind the scenes.
+## Operator and Concept Comparison
+
+### 1. Core Stream Components
+
+| RxJS (Angular)                  | Spring WebFlux/Reactor         | Description                                                      |
+| ------------------------------- | ------------------------------ | ---------------------------------------------------------------- |
+| Observable<T>                   | Flux<T>                        | Stream that can emit 0-N elements                                |
+| Observable<T> (single emission) | Mono<T>                        | Stream that emits exactly 0-1 elements                           |
+| Subscriber                      | Subscriber                     | `flux.subscribe(new Subscriber(goodFn, badFn))`                  |
+| subscribe()                     | subscribe()                    | `flux.subscribe(goodFn, badFn)` Subscriber is implicitly created |
+|                                 |                                |                                                                  |
+| Subject                         | Sinks.many()                   | Basic subject without initial value                              |
+| BehaviorSubject                 | Sinks.many().replay(1)         | Subject that replays the latest value to new subscribers         |
+| ReplaySubject                   | Sinks.many().replay(n)         | Subject that replays n values to new subscribers                 |
+| AsyncSubject                    | Sinks.one()                    | Subject that emits only the last value upon completion           |
+|                                 |                                |                                                                  |
+| subject.next(value)             | sink.tryEmitNext(value)        | Push a new value into the stream                                 |
+| subject.error(err)              | sink.tryEmitError(err)         | Push an error into the stream                                    |
+| subject.complete()              | sink.tryEmitComplete()         | Signal stream completion                                         |
+| subject.asObservable()          | sink.asFlux() or sink.asMono() | Get a "read-only" stream from the subject                        |
+
+### 2. Basic Transformations
+
+| RxJS (Angular) | Spring WebFlux/Reactor | Description                                             |
+| -------------- | ---------------------- | ------------------------------------------------------- |
+| map()          | map()                  | Transform each element in the stream                    |
+| filter()       | filter()               | Keep only elements matching a predicate                 |
+| mergeMap()     | flatMap()              | Transform each element into a new stream and flatten    |
+| zip()          | zip()                  | Combine emissions by matching index/arrival time        |
+| of()           | just()                 | Create streams from direct values                       |
+| from()         | fromIterable()         | Create streams from collections or other reactive types |
+| takeUntil()    | takeUntil()            | Take elements until another stream emits                |
+
+### 3. Flow Control Operations
+
+| RxJS (Angular)  | Spring WebFlux/Reactor         | Description                                                                               |
+| --------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| switchMap()     | switchMap()                    | Cancel previous inner streams when a new one arrives                                      |
+| combineLatest() | combineLatest()                | Combine latest values whenever any source emits                                           |
+| concat()        | concat()                       | Append one stream after another sequentially                                              |
+| merge()         | merge()                        | Combine streams as elements arrive (interleaved)                                          |
+| N/A             | flatMap() on Flux<Mono<T>>     | Flattens each Mono emitted by the Flux into a single stream of T                          |
+| N/A             | flatMapMany() on Mono<Flux<T>> | Flattens the Flux inside the Mono, emitting each item in the flattened Flux               |
+| N/A             | flatMapMany() on Mono<T>       | Transforms the value into a Flux                                                          |
+| N/A             | collectList() on Flux<T>       | Collects all items emitted by the Flux into a Mono<List<T>>                               |
+| reduce()        | reduce() on Flux<T>            | Reduces the items emitted by the Flux into a single Mono<T> using an accumulator function |
+
+### 4. Timing and Rate Management
+
+| RxJS (Angular) | Spring WebFlux/Reactor | Description                                                |
+| -------------- | ---------------------- | ---------------------------------------------------------- |
+| debounceTime() | debounce()             | Wait for quiet period before emitting most recent value    |
+| delay()        | delayElements()        | Delay emissions by a specified amount of time              |
+| throttleTime() | limitRate()            | Limit the rate of emissions                                |
+| interval()     | interval()             | Create a stream that emits sequential numbers periodically |
+| timeout()      | timeout()              | Error if no emission within specified duration             |
+
+### 5. Error Handling
+
+| RxJS (Angular)      | Spring WebFlux/Reactor | Description                                              |
+| ------------------- | ---------------------- | -------------------------------------------------------- |
+| catchError()        | onErrorResume()        | Catch errors and provide fallback logic                  |
+| retry()             | retry()                | Resubscribe to the source after an error occurs          |
+| onErrorResumeNext() | onErrorComplete()      | Continue with next observable when error occurs          |
+| finalize()          | doFinally()            | Perform action when stream completes, errors, or cancels |
+
+### 6. Utility Operations
+
+| RxJS (Angular)         | Spring WebFlux/Reactor | Description                                            |
+| ---------------------- | ---------------------- | ------------------------------------------------------ |
+| tap()                  | doOnNext()             | Perform side effects without modifying the stream      |
+| distinctUntilChanged() | distinctUntilChanged() | Emit only when value changes from previous             |
+| share()                | share()                | Share a single subscription among multiple subscribers |
+| startWith()            | startWith()            | Prepend values to the beginning of a stream            |
+| scan()                 | scan()                 | Apply accumulator function to each value (like reduce) |
+
+### 7. Concurrency Management
+
+| RxJS (Angular)          | Spring WebFlux/Reactor      | Description                                                |
+| ----------------------- | --------------------------- | ---------------------------------------------------------- |
+| observeOn()             | publishOn()                 | Specify scheduler for downstream operations                |
+| subscribeOn()           | subscribeOn()               | Specify scheduler for subscription and upstream operations |
+| asyncScheduler          | Schedulers.boundedElastic() | Schedule for I/O-bound work                                |
+| queueScheduler          | Schedulers.parallel()       | Schedule for CPU-bound work                                |
+| animationFrameScheduler | N/A                         | Schedule work with browser animation frame (RxJS specific) |
 
 ----
 
