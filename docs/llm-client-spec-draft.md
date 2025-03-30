@@ -59,17 +59,18 @@ public record LlmClientMessage(String role, String content) {
 /**
  * Error representation for LLM API errors
  * Follows the error structure defined in the API specification
+ * 
+ * @param code Provider-specific error code from LLM response.
+ *             Examples:
+ *             - OpenAI: "context_length_exceeded", "rate_limit_exceeded"
+ *             - Anthropic: "overloaded_error", "invalid_request_error"
+ *             For internal errors: "INTERNAL_ERROR"
+ *             For HTTP transport errors without LLM error code: "HTTP_" +
+ *             statusCode
  */
 public record LlmClientError(String message, String type,
-        /**
-         * Provider-specific error code from LLM response.
-         * Examples:
-         * - OpenAI: "context_length_exceeded", "rate_limit_exceeded"
-         * - Anthropic: "overloaded_error", "invalid_request_error"
-         * For internal errors: "INTERNAL_ERROR"
-         * For HTTP transport errors without LLM error code: "HTTP_" + statusCode
-         */
-        String code) {
+        String code,
+        Throwable cause) {
     /**
      * Creates an error from an exception
      * @param throwable The exception to convert
@@ -101,7 +102,8 @@ public record LlmClientError(String message, String type,
  * Represents a chunk of response from the streaming API
  * Corresponds to a single piece of a streamed response
  */
-public record LlmClientOutputChunk(LlmClientMessage message, boolean done, int index) {
+public record LlmClientOutputChunk(LlmClientMessage message, boolean done, int index,
+        LlmClientError error) {
     /**
      * Parses a JSON string into an LlmClientOutputChunk
      * @param json The JSON string to parse
@@ -548,6 +550,8 @@ class LlmClientErrorTests {
     @Test void testFromException() { /* ... */ }
     @Test void testFromResponse() { /* ... */ }
     @Test void testFromResponseWithProviderCode() { /* ... */ }
+    @Test void testFromResponseWithCause() { /* ... */ }
+    @Test void testCreate401WithBadCredentials() { /* ... */ }
 }
 
 // Test input body creation and serialization
