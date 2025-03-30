@@ -112,11 +112,11 @@ public record LlmClientOutputChunk(LlmClientMessage message, boolean done, int i
     public static LlmClientOutputChunk fromJson(String json) { /* ... */ }
 
     /**
-     * Creates an error chunk with the given message
-     * @param message The error message
+     * Creates an error chunk with the given error
+     * @param error The error
      * @return A new LlmClientOutputChunk representing an error
      */
-    public static LlmClientOutputChunk forError(String message) { /* ... */ }
+    public static LlmClientOutputChunk forError(LlmClientError error) { /* ... */ }
 }
 ```
 
@@ -165,7 +165,7 @@ public record LlmClientOutput(int statusCode, Map<String, String> headers,
      * Creates an output object representing successful verification
      * @return A new LlmClientOutput indicating verification success
      */
-    public static LlmClientOutput verificationSuccess() { /* ... */ }
+    public static LlmClientOutput forSuccessVerification() { /* ... */ }
 
     /**
      * Creates an output object for an error
@@ -270,6 +270,43 @@ public record LlmClientInput(String url, String body,
      * @param headers The HttpHeaders object to update with this input's headers
      */
     public void setHeaders(HttpHeaders headers) { /* ... */ }
+}
+```
+
+### LlmClientPreflightException
+
+```java
+/**
+ * Exception thrown during the preflight phase of an LLM request.
+ * This includes all processing that happens before the actual HTTP request is made,
+ * such as input validation, resource checks, rate limiting, etc.
+ */
+public class LlmClientPreflightException extends RuntimeException {
+    /**
+     * The LlmClientOutput containing the failure details.
+     * This output will be returned to the client when the exception is caught,
+     * maintaining consistent error reporting throughout the application.
+     */
+    private final LlmClientOutput output;
+
+    /**
+     * Creates a new LlmClientPreflightException with the specified output
+     * 
+     * @param output The LlmClientOutput containing the failure details
+     */
+    public LlmClientPreflightException(LlmClientOutput output) {
+        super(output.getFailureReason());
+        this.output = output;
+    }
+
+    /**
+     * Gets the LlmClientOutput associated with this exception
+     * 
+     * @return The LlmClientOutput containing the failure details
+     */
+    public LlmClientOutput getOutput() {
+        return output;
+    }
 }
 ```
 
