@@ -1,5 +1,8 @@
 # LLM Client Implementation Specification (Reactive Pattern)
 
+- This is a draft spec
+- Refer to [llm-client](https://github.com/mingzilla/llm-client) for actual implementation
+
 ## Project Overview
 
 - **Project Name:** llm-client
@@ -421,124 +424,7 @@ public class LlmClientJsonUtil {
 
 ## Example Controller Implementation
 
-```java
-/**
- * Example controller that demonstrates how to use the LlmClient library
- * Shows implementations for all three endpoints: json, stream, and sse
- */
-@RestController
-@RequestMapping("/chat")
-public class ChatController {
-    private final LlmClient llmClient;
-    private final String apiUrl;
-    private final UserRepository userRepository;  // Example repository for DB access
-    
-    public ChatController(LlmClient llmClient, 
-                         @Value("${llm.api.url}") String apiUrl,
-                         UserRepository userRepository) {
-        this.llmClient = llmClient;
-        this.apiUrl = apiUrl;
-        this.userRepository = userRepository;
-    }
-    
-    /**
-     * Non-streaming JSON response endpoint
-     * Use for regular single response completions
-     */
-    @PostMapping("/json")
-    public Mono<LlmClientOutput> json(@RequestBody ChatRequest request) {
-        return llmClient.handleSend(() -> {
-            // Any blocking database calls can safely go here
-            User user = userRepository.findById(request.getUserId());
-            List<Document> userDocs = documentRepository.findByUserId(user.getId());
-            
-            // Process data as needed
-            List<LlmClientMessage> messages = createMessagesFromUserAndRequest(user, userDocs, request);
-            
-            // Return the input object for the LLM request
-            return LlmClientInput.chat(
-                apiUrl + "/chat/completions", 
-                LlmClientInputBody.chat(
-                    request.getModel(),
-                    messages,
-                    false,  // Not streaming
-                    request.getTemperature()
-                ), 
-                createHeadersFromUser(user)
-            );
-        });
-    }
-    
-    /**
-     * Streaming JSON response endpoint
-     * Use for JSON streaming responses (newline-delimited JSON)
-     */
-    @PostMapping(value = "/stream", produces = MediaType.APPLICATION_NDJSON_VALUE)
-    public Flux<LlmClientOutputChunk> stream(@RequestBody ChatRequest request) {
-        return llmClient.handleStream(() -> {
-            // All blocking database access and processing can safely go here
-            User user = userRepository.findById(request.getUserId());
-            Preferences prefs = preferencesRepository.findByUserId(user.getId());
-            
-            // Process data as needed to build the request
-            List<LlmClientMessage> messages = buildMessagesWithUserContext(user, prefs, request);
-            
-            // Return the input object for the LLM request
-            return LlmClientInput.chat(
-                apiUrl + "/chat/completions", 
-                LlmClientInputBody.chat(
-                    request.getModel(),
-                    messages,
-                    true,  // Streaming
-                    request.getTemperature()
-                ), 
-                createHeadersWithAuth(user.getApiToken())
-            );
-        });
-    }
-    
-    /**
-     * SSE streaming response endpoint
-     * Use for Server-Sent Events streaming
-     */
-    @PostMapping(value = "/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<?>> sse(@RequestBody ChatRequest request) {
-        return llmClient.handleStreamSse(() -> {
-            // All blocking code including database queries can safely go here
-            ConversationHistory history = conversationRepository.findLatestByUserId(request.getUserId());
-            List<Message> previousMessages = messageRepository.findByConversationId(history.getId());
-            
-            // Process the data as needed
-            List<LlmClientMessage> messages = convertToLlmMessages(previousMessages, request.getContent());
-            
-            // Return the input object for the LLM request
-            return LlmClientInput.chat(
-                apiUrl + "/chat/sse", 
-                LlmClientInputBody.sse(
-                    request.getModel(),
-                    messages,
-                    request.getTemperature()
-                ), 
-                createAuthHeaders(request.getApiKey())
-            );
-        });
-    }
-}
-
-/**
- * Example request body for chat completions
- */
-public record ChatRequest(
-    String userId,
-    String model,
-    List<LlmClientMessage> messages,
-    String content,
-    Double temperature,
-    String apiKey
-) {
-    // Could include other parameters like max_tokens, top_p, etc.
-}
-```
+- Refer to [llm-client](https://github.com/mingzilla/llm-client)
 
 ## Implementation Guidelines
 

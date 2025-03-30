@@ -22,8 +22,8 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 
 ## Chat Completion Integration (Draft)
 
-- [Spring Web Flux - Non-Blocking Requests](https://mingzilla.github.io/specification/spring-web-flux)
-- [Java Reactive Concurrency Guide](https://mingzilla.github.io/specification/java-reactive-concurrency-guide)
+- [Flux - Reactor - Spring Web Flux](https://mingzilla.github.io/specification/spring-web-flux)
+- [Flux - Reactor - Java Reactive Concurrency Guide](https://mingzilla.github.io/specification/java-reactive-concurrency-guide)
 - [LlmClient - Draft Design Spec](https://mingzilla.github.io/specification/llm-client-spec-draft)
 
 
