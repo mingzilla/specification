@@ -1,8 +1,5 @@
 # LLM Client Implementation Specification (Reactive Pattern)
 
-- This is a draft spec
-- Refer to [llm-client](https://github.com/mingzilla/llm-client) for actual implementation
-
 ## Project Overview
 
 - **Project Name:** llm-client
@@ -14,21 +11,13 @@
 ## Core Principles
 
 1. **100% Non-blocking:** The entire library must be fully non-blocking from end to end, using Spring WebFlux reactive types (Mono/Flux) throughout.
-
 2. **Minimalist Design:** Focus only on LLM chat completions API interactions, avoiding feature bloat.
-
 3. **Immutable Data Structures:** Use Java records for all data structures to ensure immutability.
-
 4. **Reactive Streaming:** Support both traditional request/response and streaming (JSON and SSE).
-
 5. **Full Specification Compliance:** Adhere strictly to the streaming-api-spec.md format.
-
 6. **Clear Error Handling:** Consistent approach to error handling throughout the library.
-
 7. **Pure Reactive Patterns:** Use standard reactive patterns without callbacks to ensure compatibility with Spring WebFlux controllers.
-
 8. **Separate Endpoints:** Distinct endpoints for each response type: json, stream, and sse.
-
 9. **Safe Integration with Blocking Code:** Provide appropriate patterns for safely integrating with blocking database operations.
 
 ## Domain Model Specification
@@ -71,7 +60,16 @@ public record LlmClientMessage(String role, String content) {
  * Error representation for LLM API errors
  * Follows the error structure defined in the API specification
  */
-public record LlmClientError(String message, String type, String code) {
+public record LlmClientError(String message, String type,
+        /**
+         * Provider-specific error code from LLM response.
+         * Examples:
+         * - OpenAI: "context_length_exceeded", "rate_limit_exceeded"
+         * - Anthropic: "overloaded_error", "invalid_request_error"
+         * For internal errors: "INTERNAL_ERROR"
+         * For HTTP transport errors without LLM error code: "HTTP_" + statusCode
+         */
+        String code) {
     /**
      * Creates an error from an exception
      * @param throwable The exception to convert
@@ -80,12 +78,19 @@ public record LlmClientError(String message, String type, String code) {
     public static LlmClientError fromException(Throwable throwable) { /* ... */ }
 
     /**
-     * Creates an error from a response status and message
+     * Creates an error from a response status, message, and provider-specific error code
      * @param statusCode The HTTP status code
      * @param message The error message
+     * @param providerCode Provider-specific error code from response (can be null)
      * @return A new LlmClientError with appropriate type and code
      */
-    public static LlmClientError fromResponse(int statusCode, String message) { /* ... */ }
+    public static LlmClientError fromResponse(int statusCode, String message, String providerCode) { /* ... */ }
+
+    /**
+     * Creates a standard 401 Unauthorized error
+     * @return A new LlmClientError for unauthorized access
+     */
+    public static LlmClientError create401() { /* ... */ }
 }
 ```
 
@@ -103,6 +108,13 @@ public record LlmClientOutputChunk(LlmClientMessage message, boolean done, int i
      * @return A new LlmClientOutputChunk
      */
     public static LlmClientOutputChunk fromJson(String json) { /* ... */ }
+
+    /**
+     * Creates an error chunk with the given message
+     * @param message The error message
+     * @return A new LlmClientOutputChunk representing an error
+     */
+    public static LlmClientOutputChunk forError(String message) { /* ... */ }
 }
 ```
 
@@ -148,9 +160,16 @@ public record LlmClientOutput(int statusCode, Map<String, String> headers,
     public Map<String, Object> asMap() { /* ... */ }
 
     /**
+     * Creates an output object representing successful verification
+     * @return A new LlmClientOutput indicating verification success
+     */
+    public static LlmClientOutput verificationSuccess() { /* ... */ }
+
+    /**
      * Creates an output object for an error
-     * @param error The LlmClientError
+     * @param error The LlmClientError, must not be null
      * @return A new LlmClientOutput with the error set
+     * @throws IllegalArgumentException if error is null
      */
     public static LlmClientOutput forError(LlmClientError error) { /* ... */ }
 
@@ -161,6 +180,20 @@ public record LlmClientOutput(int statusCode, Map<String, String> headers,
      * @return A new LlmClientOutput with success data
      */
     public static LlmClientOutput forSuccess(ClientResponse response, String body) { /* ... */ }
+
+    /**
+     * Creates a response from a WebClient response
+     * @param response The WebClient response
+     * @param body The response body as string
+     * @return A new LlmClientOutput instance
+     */
+    public static LlmClientOutput fromResponse(ClientResponse response, String body) { /* ... */ }
+
+    /**
+     * Creates an output object for a 401 Unauthorized error
+     * @return A new LlmClientOutput with 401 error
+     */
+    public static LlmClientOutput forError401() { /* ... */ }
 }
 ```
 
@@ -229,7 +262,33 @@ public record LlmClientInput(String url, String body,
     public static LlmClientInput chat(String url, LlmClientInputBody inputBody, 
                                     Map<String, String> headers) { /* ... */ }
 
+    /**
+     * Sets HTTP headers for the request
+     * Adds all headers from this input's headers map to the provided HttpHeaders object
+     * @param headers The HttpHeaders object to update with this input's headers
+     */
     public void setHeaders(HttpHeaders headers) { /* ... */ }
+}
+```
+
+### LlmClientVerifier
+
+```java
+/**
+ * Verification helper for LLM client operations
+ */
+public final class LlmClientVerifier {
+    private LlmClientVerifier() {
+        // Prevent instantiation
+    }
+
+    /**
+     * Verifies that a required component is not null
+     * @param component The component to verify
+     * @param name The name of the component for the error message
+     * @throws IllegalArgumentException if the component is null
+     */
+    public static void require(Object component, String name) { /* ... */ }
 }
 ```
 
@@ -259,75 +318,16 @@ public class LlmClient {
     public static LlmClient create(WebClient webClient) { /* ... */ }
     
     /**
-     * IMPORTANT: Do not use this method directly. Use handleSend() instead
-     * to ensure proper handling of potentially blocking preparation code.
+     * Handles verification and sending a request with a simpler API
+     * Executes verification check before proceeding with the request
      * 
-     * Sends a request to the LLM API and returns a single non-streaming response
-     * @param input The LlmClientInput containing the request details
+     * @param verificationSupplier A supplier that returns LlmClientError if verification fails, null if successful
+     * @param inputSupplier A supplier function that provides the LlmClientInput
      * @return A Mono that emits the LlmClientOutput when the request completes
      */
-    private Mono<LlmClientOutput> send(LlmClientInput input) { 
-        return webClient.post()
-            .uri(input.url())
-            .bodyValue(input.body())
-            .headers(input::setHeaders)
-            .retrieve()
-            .bodyToMono(String.class)
-            .map(this::parseResponse)
-            .onErrorResume(error -> Mono.just(
-                LlmClientOutput.forError(LlmClientError.fromException(error))));
-    }
-    
-    /**
-     * IMPORTANT: Do not use this method directly. Use handleStream() instead
-     * to ensure proper handling of potentially blocking preparation code.
-     * 
-     * Streams a request to the LLM API with JSON streaming format
-     * @param input The LlmClientInput containing the request details
-     * @return A Flux that emits each chunk from the streaming response
-     */
-    private Flux<LlmClientOutputChunk> stream(LlmClientInput input) {
-        return webClient.post()
-            .uri(input.url())
-            .bodyValue(input.body())
-            .headers(input::setHeaders)
-            .retrieve()
-            .bodyToFlux(String.class)
-            .filter(line -> !line.isEmpty())
-            .map(this::parseChunk)
-            .takeUntil(LlmClientOutputChunk::done);
-    }
-    
-    /**
-     * IMPORTANT: Do not use this method directly. Use handleStreamSse() instead
-     * to ensure proper handling of potentially blocking preparation code.
-     * 
-     * Streams a request to the LLM API with SSE streaming format
-     * @param input The LlmClientInput containing the request details
-     * @return A Flux that emits each SSE event from the streaming response
-     */
-    private Flux<ServerSentEvent<?>> streamSse(LlmClientInput input) {
-        return webClient.post()
-            .uri(input.url())
-            .bodyValue(input.body())
-            .headers(headers -> headers.putAll(input.headers()))
-            .retrieve()
-            .bodyToFlux(String.class)
-            .filter(line -> !line.isEmpty())
-            .map(line -> {
-                String data = line.startsWith("data: ") ? line.substring(6) : line;
-                if ("[DONE]".equals(data)) {
-                    return ServerSentEvent.<String>builder()
-                            .data("[DONE]")
-                            .build();
-                } else {
-                    return ServerSentEvent.<LlmClientOutputChunk>builder()
-                            .data(LlmClientJsonUtil.parseStreamChunk(data))
-                            .build();
-                }
-            })
-            .takeUntil(event -> event.data() != null && "[DONE]".equals(event.data()));
-    }
+    public Mono<LlmClientOutput> verifyAndSend(
+            Supplier<LlmClientOutput> verificationSupplier,
+            Supplier<LlmClientInput> inputSupplier) { /* ... */ }
     
     /**
      * Safely handles sending a request with potentially blocking preparation logic
@@ -336,11 +336,30 @@ public class LlmClient {
      * @param inputSupplier A supplier function that provides the LlmClientInput, may contain blocking code
      * @return A Mono that emits the LlmClientOutput when the request completes
      */
-    public Mono<LlmClientOutput> handleSend(Supplier<LlmClientInput> inputSupplier) {
-        return Mono.fromCallable(inputSupplier::get)
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap(this::send);
-    }
+    public Mono<LlmClientOutput> handleSend(Supplier<LlmClientInput> inputSupplier) { /* ... */ }
+    
+    /**
+     * IMPORTANT: Do not use this method directly. Use handleSend() instead
+     * to ensure proper handling of potentially blocking preparation code.
+     * 
+     * Sends a request to the LLM API and returns a single non-streaming response
+     * 
+     * @param input The LlmClientInput containing the request details
+     * @return A Mono that emits the LlmClientOutput when the request completes
+     */
+    private Mono<LlmClientOutput> send(LlmClientInput input) { /* ... */ }
+    
+    /**
+     * Handles verification and streaming a request with a simpler API
+     * Executes verification check before proceeding with the request
+     * 
+     * @param verificationSupplier A supplier that returns LlmClientError if verification fails, null if successful
+     * @param inputSupplier A supplier function that provides the LlmClientInput
+     * @return A Flux that emits each chunk from the streaming response
+     */
+    public Flux<LlmClientOutputChunk> verifyAndStream(
+            Supplier<LlmClientOutput> verificationSupplier,
+            Supplier<LlmClientInput> inputSupplier) { /* ... */ }
     
     /**
      * Safely handles streaming a request with potentially blocking preparation logic
@@ -349,11 +368,30 @@ public class LlmClient {
      * @param inputSupplier A supplier function that provides the LlmClientInput, may contain blocking code
      * @return A Flux that emits each chunk from the streaming response
      */
-    public Flux<LlmClientOutputChunk> handleStream(Supplier<LlmClientInput> inputSupplier) {
-        return Mono.fromCallable(inputSupplier::get)
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(this::stream);
-    }
+    public Flux<LlmClientOutputChunk> handleStream(Supplier<LlmClientInput> inputSupplier) { /* ... */ }
+    
+    /**
+     * IMPORTANT: Do not use this method directly. Use handleStream() instead
+     * to ensure proper handling of potentially blocking preparation code.
+     * 
+     * Streams a request to the LLM API with JSON streaming format
+     * 
+     * @param input The LlmClientInput containing the request details
+     * @return A Flux that emits each chunk from the streaming response
+     */
+    private Flux<LlmClientOutputChunk> stream(LlmClientInput input) { /* ... */ }
+    
+    /**
+     * Handles verification and SSE streaming a request with a simpler API
+     * Executes verification check before proceeding with the request
+     * 
+     * @param verificationSupplier A supplier that returns LlmClientError if verification fails, null if successful
+     * @param inputSupplier A supplier function that provides the LlmClientInput
+     * @return A Flux that emits each SSE event from the streaming response
+     */
+    public Flux<ServerSentEvent<?>> verifyAndStreamSse(
+            Supplier<LlmClientOutput> verificationSupplier,
+            Supplier<LlmClientInput> inputSupplier) { /* ... */ }
     
     /**
      * Safely handles SSE streaming a request with potentially blocking preparation logic
@@ -362,16 +400,18 @@ public class LlmClient {
      * @param inputSupplier A supplier function that provides the LlmClientInput, may contain blocking code
      * @return A Flux that emits each SSE event from the streaming response
      */
-    public Flux<ServerSentEvent<?>> handleStreamSse(Supplier<LlmClientInput> inputSupplier) {
-        return Mono.fromCallable(inputSupplier::get)
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(this::streamSse);
-    }
+    public Flux<ServerSentEvent<?>> handleStreamSse(Supplier<LlmClientInput> inputSupplier) { /* ... */ }
     
-    // Private utility methods
-    private LlmClientOutput parseResponse(String responseBody) { /* ... */ }
-    private LlmClientOutputChunk parseChunk(String chunk) { /* ... */ }
-    private boolean isDone(String chunk) { /* ... */ }
+    /**
+     * IMPORTANT: Do not use this method directly. Use handleStreamSse() instead
+     * to ensure proper handling of potentially blocking preparation code.
+     * 
+     * Streams a request to the LLM API with SSE streaming format
+     * 
+     * @param input The LlmClientInput containing the request details
+     * @return A Flux that emits each SSE event from the streaming response
+     */
+    private Flux<ServerSentEvent<?>> streamSse(LlmClientInput input) { /* ... */ }
 }
 ```
 
@@ -383,8 +423,11 @@ public class LlmClient {
  * Provides JSON parsing and serialization capabilities
  */
 public class LlmClientJsonUtil {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     /**
-     * Parses a JSON string into an object
+     * Parses a JSON string into a simple class type
+     * @param <T> The type to parse the JSON into
      * @param json The JSON string to parse
      * @param clazz The class to parse into
      * @return The parsed object
@@ -392,12 +435,16 @@ public class LlmClientJsonUtil {
     public static <T> T fromJson(String json, Class<T> clazz) { /* ... */ }
     
     /**
-     * Parses a JSON string into a complex type
+     * Convert JSON string to object using TypeReference
+     * e.g. {@code new TypeReference<Map<String, List>>() {}}
+     * returns a {@code Map<String, List>}
+     * 
+     * @param <T> The type to parse the JSON into
      * @param json The JSON string to parse
      * @param typeReference The TypeReference describing the type
      * @return The parsed object
      */
-    public static <T> T fromJson(String json, TypeReference<T> typeReference) { /* ... */ }
+    public static <T> T fromJsonToStructure(String json, TypeReference<T> typeReference) { /* ... */ }
     
     /**
      * Converts an object to a JSON string
@@ -419,6 +466,18 @@ public class LlmClientJsonUtil {
      * @return true if the chunk is an end marker, false otherwise
      */
     public static boolean isStreamEnd(String chunk) { /* ... */ }
+
+    /**
+     * Extracts error code from LLM provider error response
+     * Handles different provider formats:
+     * - OpenAI: {"error": {"code": "context_length_exceeded"}}
+     * - Anthropic: {"error": {"type": "invalid_request_error"}}
+     * - Generic: {"code": "error_code"}
+     *
+     * @param errorBody The error response body
+     * @return The provider error code or null if not found
+     */
+    public static String extractErrorCode(String errorBody) { /* ... */ }
 }
 ```
 
@@ -431,43 +490,30 @@ public class LlmClientJsonUtil {
 ### Non-blocking Requirements
 
 1. **WebClient Usage:** All HTTP requests must use Spring WebFlux's WebClient with non-blocking methods.
-
 2. **Reactive Types:** All API methods must return Mono or Flux and not block.
-
 3. **No Blocking Calls:** Never use `.block()`, `.toFuture().get()`, or similar blocking methods.
-
 4. **Reactive Operators:** Use appropriate reactive operators like `map`, `flatMap`, `doOnNext`, etc.
-
 5. **Thread Verification:** Unit tests must verify that operations run on non-blocking threads.
-
 6. **Blocking Code Handling:** All potentially blocking code (database queries, file I/O) must be wrapped in supplier functions and processed through the handle* methods.
 
 ### JSON Parsing and Serialization
 
 1. **Jackson Integration:** Use Jackson for JSON handling, configured for Spring WebFlux.
-
 2. **Error Handling:** Handle JSON parsing errors gracefully with proper error propagation.
-
 3. **Streaming Parsing:** For streaming responses, parse chunks individually without blocking.
 
 ### Stream Processing
 
 1. **Chunked Processing:** Properly handle line-delimited JSON in streams.
-
 2. **End Detection:** Correctly identify stream termination markers (`"done": true` or `data: [DONE]`).
-
 3. **SSE Handling:** For SSE streams, use the appropriate WebClient methods and SSE decoder.
-
 4. **Backpressure:** Respect backpressure throughout stream processing.
 
 ### Error Handling
 
 1. **Consistent Approach:** Convert all errors to LlmClientError.
-
 2. **Non-blocking:** Error handling must not block.
-
 3. **Propagation:** Error states should properly propagate through reactive chains.
-
 4. **Status Codes:** Correctly handle different HTTP status codes.
 
 ## Testing Strategy
@@ -476,55 +522,70 @@ public class LlmClientJsonUtil {
 
 1. **Non-blocking Verification:**
    - Use `StepVerifier` to test reactive streams
-   - Verify execution on non-blocking threads using `Thread.currentThread().getName()`
-   - Ensure no blocking operations are used in implementations
+   - Verify execution on non-blocking threads
+   - Ensure no blocking operations are used
 
 2. **Mock Integration:**
-   - Use `MockWebServer` or WebTestClient to simulate HTTP responses
+   - Use `MockWebServer` to simulate HTTP responses
    - Test various response scenarios including success, errors, and timeouts
    - Verify correct handling of different content types
 
 3. **Stream Testing:**
    - Test with simulated chunked/SSE responses
-   - Verify correct chunk accumulation
+   - Verify correct chunk processing
    - Validate end-of-stream detection
 
-4. **Stress Testing:**
-   - Test with high concurrency to ensure no blocking occurs under load
-   - Verify backpressure handling with large responses
-   - Test with intermittent delays to simulate network latency
+4. **Error Handling Tests:**
+   - Verify proper error propagation
+   - Test provider-specific error code extraction
+   - Check HTTP status code handling
 
-5. **Blocking Code Integration:**
-   - Test that blocking code in supplier functions is correctly executed on boundedElastic threads
-   - Verify that the main event loop threads are not blocked by database operations
-
-### Example Test Structure
+### Example Test Classes
 
 ```java
-public class LlmClientTests {
-    // Test non-blocking behavior
-    @Test
-    public void testNonBlockingSend() { /* ... */ }
-    
-    // Test JSON streaming
-    @Test
-    public void testJsonStreaming() { /* ... */ }
-    
-    // Test SSE streaming
-    @Test
-    public void testSseStreaming() { /* ... */ }
-    
-    // Test error handling
-    @Test
-    public void testErrorHandling() { /* ... */ }
-    
-    // Test backpressure
-    @Test
-    public void testBackpressure() { /* ... */ }
-    
-    // Test blocking code integration
-    @Test
-    public void testBlockingCodeIntegration() { /* ... */ }
+// Test basic error functionality
+class LlmClientErrorTests {
+    @Test void testFromException() { /* ... */ }
+    @Test void testFromResponse() { /* ... */ }
+    @Test void testFromResponseWithProviderCode() { /* ... */ }
+}
+
+// Test input body creation and serialization
+class LlmClientInputBodyTests {
+    @Test void testChat() { /* ... */ }
+    @Test void testSse() { /* ... */ }
+    @Test void testToJsonObject() { /* ... */ }
+}
+
+// Test JSON utility functions
+class LlmClientJsonUtilTests {
+    @Test void extractErrorCode_nullOrEmpty_returnsNull() { /* ... */ }
+    @Test void extractErrorCode_invalidJson_returnsNull() { /* ... */ }
+    @Test void extractErrorCode_directCode_returnsCode() { /* ... */ }
+    @Test void extractErrorCode_openAiStyle_returnsCode() { /* ... */ }
+    @Test void extractErrorCode_anthropicStyle_returnsType() { /* ... */ }
+    @Test void extractErrorCode_noCodeOrType_returnsNull() { /* ... */ }
+}
+
+// Test message creation
+class LlmClientMessageTests {
+    @Test void testSystemMessage() { /* ... */ }
+    @Test void testUserMessage() { /* ... */ }
+    @Test void testAssistantMessage() { /* ... */ }
+}
+
+// Test output chunk parsing
+class LlmClientOutputChunkTests {
+    @Test void testFromJson() { /* ... */ }
+    @Test void testFromInvalidJson() { /* ... */ }
+}
+
+// Integration tests for the main client
+class LlmClientTests {
+    @Test void testNonBlockingSend() { /* ... */ }
+    @Test void testJsonStreaming() { /* ... */ }
+    @Test void testSseStreaming() { /* ... */ }
+    @Test void testErrorHandling() { /* ... */ }
 }
 ```
 
@@ -536,7 +597,7 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'com.example'
+group = 'io.github.mingzilla'
 version = '0.1.0'
 sourceCompatibility = '17'
 
@@ -570,18 +631,20 @@ publishing {
 
 ## Best Practices for Blocking Code Integration
 
-1. **Use handleSend/handleStream/handleStreamSse methods** - Never directly call the private send/stream/streamSse methods.
+1. **Use verification methods** - `verifyAndSend`, `verifyAndStream`, and `verifyAndStreamSse` methods provide integrated verification before executing requests.
 
-2. **Keep blocking code minimal** - Only include necessary database calls and processing logic in the supplier function.
+2. **Use handle* methods for blocking preparation** - Never directly call the private send/stream/streamSse methods. Always use `handleSend`, `handleStream`, or `handleStreamSse`.
 
-3. **Return prepared input** - The supplier should return a fully configured LlmClientInput object.
+3. **Keep blocking code minimal** - Only include necessary database calls and processing logic in the supplier function.
 
-4. **Handle errors** - Include appropriate error handling within the supplier function.
+4. **Return prepared input** - The supplier should return a fully configured LlmClientInput object.
 
-5. **Avoid nested reactive code** - Don't include Mono/Flux operations inside the supplier function.
+5. **Handle errors** - Include appropriate error handling within the supplier function.
 
-6. **Consider timeout handling** - For long-running database operations, consider adding timeouts.
+6. **Avoid nested reactive code** - Don't include Mono/Flux operations inside the supplier function.
 
-7. **Clean DB connections** - Ensure any database resources are properly closed within the supplier function.
+7. **Consider timeout handling** - For long-running database operations, consider adding timeouts.
+
+8. **Perform validation** - Use LlmClientVerifier.require() to validate inputs and prevent NullPointerExceptions.
 
 These guidelines ensure a clean separation between potentially blocking preparation code and the non-blocking reactive pipeline for API communication.
