@@ -44,7 +44,7 @@ def lambda_handler(event, context):
     
     # Verify Bearer token authentication
     request_headers = event.get('headers', {})
-    authorization = request_headers.get('Authorization')
+    authorization = request_headers.get('authorization')  # Changed from 'Authorization' to 'authorization' because aws lambda forces it to be lowercase
     
     start_time = time.time()
     customer_id = None
@@ -95,7 +95,7 @@ def lambda_handler(event, context):
         request_body = json.loads(event.get('body', '{}'))
         
         # Extract modelId from the request
-        model_id = request_body.pop('modelId', None)
+        model_id = request_body.pop('model', None)  # Changed from 'modelId' to 'model'
         
         if not model_id:
             return {
