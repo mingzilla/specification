@@ -57,6 +57,7 @@ def lambda_handler(event, context):
         print(f"Path: {event.get('path')}")
         
         if not authorization or not authorization.startswith('Bearer '):
+            print(f'authoirzation: {authorization}')
             return {
                 'statusCode': 401,
                 'headers': headers,
@@ -121,7 +122,7 @@ def lambda_handler(event, context):
         input_tokens = estimate_tokens(input_text, model_id)
         
         # Convert remaining payload to JSON string
-        payload = json.dumps(request_body)
+        request_body_json_string = json.dumps(request_body)
         
         print(f"Calling Bedrock model: {model_id} for customer: {customer_id} (Streaming: {use_streaming})")
         
@@ -132,7 +133,7 @@ def lambda_handler(event, context):
                 modelId=model_id,
                 contentType='application/json',
                 accept='application/json',
-                body=payload
+                body=request_body_json_string
             )
             
             # Parse and return the response
@@ -200,7 +201,7 @@ def lambda_handler(event, context):
                         modelId=model_id,
                         contentType='application/json',
                         accept='application/json',
-                        body=payload
+                        body=request_body_json_string
                     )
                     
                     # Process each chunk in the stream
@@ -257,7 +258,7 @@ def lambda_handler(event, context):
                     modelId=model_id,
                     contentType='application/json',
                     accept='application/json',
-                    body=payload
+                    body=request_body_json_string
                 )
                 
                 # Process each chunk in the stream
