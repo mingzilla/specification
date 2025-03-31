@@ -68,6 +68,7 @@ def lambda_handler(event, context):
             }
 
         request_body_json_string = json.dumps(request_body)
+        
 
         # Invoke the Bedrock model
         response = bedrock_runtime.invoke_model(

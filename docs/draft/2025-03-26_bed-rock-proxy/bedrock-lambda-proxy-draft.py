@@ -1,6 +1,7 @@
 import json
 import boto3
 import os
+import secrets
 
 # Initialize the Bedrock Runtime client
 bedrock_runtime = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION'))
@@ -21,6 +22,32 @@ def lambda_handler(event, context):
             'headers': headers,
             'body': json.dumps({'message': 'CORS preflight response'})
         }
+    
+    # Verify Bearer token authentication
+    request_headers = event.get('headers', {})
+    authorization = request_headers.get('Authorization')
+    
+    # Get expected token from environment variable
+    expected_token = os.environ.get('AUTH_TOKEN')
+    
+    # Check if authentication is required (token exists in environment)
+    if expected_token:
+        if not authorization or not authorization.startswith('Bearer '):
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Authorization header missing or invalid format. Use Bearer token.'})
+            }
+        
+        # Extract the token
+        token = authorization.replace('Bearer ', '')
+        
+        if token != expected_token:
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Invalid token'})
+            }
     
     try:
         # Parse the request body
