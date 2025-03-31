@@ -1,6 +1,6 @@
 # AWS Bedrock Streaming Implementation Guide
 
-This document explains the streaming capabilities in the AWS Bedrock Lambda Proxy (`bedrock-lambda-proxy.py`), including implementation details and deployment notes.
+This document explains the streaming capabilities in the AWS Bedrock Lambda Proxy (`bedrock-lambda-proxy-streaming.py`), including implementation details and deployment notes.
 
 ## Overview
 

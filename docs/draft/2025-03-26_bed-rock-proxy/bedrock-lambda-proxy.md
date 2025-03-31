@@ -6,6 +6,7 @@ This document contains the Python code for a Lambda function that acts as a prox
 
 - [bedrock-lambda-proxy.py](bedrock-lambda-proxy.py)
 - [bedrock-streaming-docs.md](bedrock-streaming-docs.md) - Detailed documentation on streaming implementation
+  - [bedrock-lambda-proxy-streaming.py](bedrock-lambda-proxy-streaming.py)
 
 ## Deployment Instructions
 
