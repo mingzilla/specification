@@ -32,6 +32,11 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 - [AWS Bedrock Lambda Proxy](https://mingzilla.github.io/specification/draft/2025-03-26_bed-rock-proxy/bedrock-lambda-proxy)
 - [AWS Bedrock Lambda Proxy - Customer Usage Tracking](https://mingzilla.github.io/specification/draft/2025-03-26_bed-rock-tracking/bedrock-usage-tracking)
 
+## Observability
+
+- [Component Diagnostics Utility Specification](https://mingzilla.github.io/specification/other/diagnostic-util-spec/diagnostic-util-spec)
+
+
 ## Other
 
 - [Cheat Sheet - Java Stream API](https://mingzilla.github.io/specification/other/java-stream-api)
