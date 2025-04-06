@@ -128,28 +128,93 @@ Apache Lucene 9.8 is a high-performance, full-featured search engine library wri
 
 ### Indexing
 
+Lucene indexing involves three key concepts:
+1. **Storing** - Keeping the original value for retrieval (`Field.Store.YES`)
+2. **Indexing** - Making the field searchable (varies by field type)
+3. **DocValues** - Column-oriented storage for sorting/faceting
+
 ```java
 // Create an index writer configuration
 IndexWriterConfig config = new IndexWriterConfig(analyzer);
-config.setOpenMode(OpenMode.CREATE); // or OpenMode.CREATE_OR_APPEND
+
+// OpenMode options:
+config.setOpenMode(OpenMode.CREATE);          // New index, deleting existing
+config.setOpenMode(OpenMode.APPEND);          // Add to existing index
+config.setOpenMode(OpenMode.CREATE_OR_APPEND); // Create if missing, else append
+
+// Optional performance settings
+config.setRAMBufferSizeMB(256.0);            // Default is 16MB
+config.setMaxBufferedDocs(10000);            // Default is IndexWriterConfig.DISABLE_AUTO_FLUSH
 
 // Create an index writer
 IndexWriter writer = new IndexWriter(directory, config);
 
-// Create a document
-Document doc = new Document();
-doc.add(new TextField("title", "Document Title", Field.Store.YES));
-doc.add(new StringField("id", "doc1", Field.Store.YES));
-doc.add(new IntPoint("year", 2025));
+// Document examples showing different field combinations:
 
-// Add the document to the index
-writer.addDocument(doc);
+// Example 1: Basic searchable and retrievable text
+Document doc1 = new Document();
+doc1.add(new TextField("title", "Searchable Title", Field.Store.YES));     // Analyzed, stored
+doc1.add(new StringField("id", "doc1", Field.Store.YES));                 // Not analyzed, stored
 
-// Commit changes
-writer.commit();
+// Example 2: Numeric field with search and sort capabilities
+Document doc2 = new Document();
+doc2.add(new IntPoint("price", 1000));                    // For range queries
+doc2.add(new StoredField("price", 1000));                // For value retrieval
+doc2.add(new NumericDocValuesField("price", 1000));      // For sorting/faceting
 
-// Close the writer when done
+// Example 3: Text field with different options
+Document doc3 = new Document();
+// Analyzed and stored (full-text search + retrieval)
+doc3.add(new TextField("description", "Product description", Field.Store.YES));
+// Analyzed but not stored (searchable only)
+doc3.add(new TextField("keywords", "searchable terms", Field.Store.NO));
+// Not analyzed but stored (exact match + retrieval)
+doc3.add(new StringField("sku", "12345", Field.Store.YES));
+
+// Indexing options
+writer.addDocument(doc1);                    // Add new document
+writer.updateDocument(                       // Update existing document
+    new Term("id", "doc1"),                 // Unique identifier
+    doc2                                    // New document
+);
+writer.deleteDocuments(new Term("id", "doc1")); // Delete by term
+writer.deleteAll();                            // Clear the index
+
+// Commit options
+writer.commit();                             // Standard commit
+writer.flush();                              // Flush buffer without commit
+writer.forceMerge(1);                        // Optimize index (expensive)
+
+// Always close when done
 writer.close();
+```
+
+### Example: Storing vs Indexing Fields
+
+```java
+Document doc = new Document();
+
+// Example 1: Field that is both indexed and stored
+doc.add(new StringField("id", "doc123", Field.Store.YES));  // Can search and retrieve
+
+// Example 2: Field that is only indexed (for searching) but not stored
+doc.add(new IntPoint("price", 1000));  // Can search but can't retrieve original value
+// Need an additional StoredField to retrieve the value:
+doc.add(new StoredField("price", 1000));
+
+// Example 3: Field for sorting/faceting with value retrieval
+doc.add(new NumericDocValuesField("rating", 4));  // For sorting
+doc.add(new StoredField("rating", 4));            // For retrieval
+
+// Example 4: Field that is only stored (no searching/sorting)
+doc.add(new StoredField("metadata", "some value"));  // Can retrieve but can't search
+
+// Later, when retrieving:
+Document retrievedDoc = searcher.doc(docId);
+String id = retrievedDoc.get("id");           // Works - field was stored
+int rating = retrievedDoc.get("rating");      // Works - added StoredField
+String metadata = retrievedDoc.get("metadata"); // Works - field was stored
+// int price = retrievedDoc.get("price");     // Would return null if only IntPoint was used
 ```
 
 ### Searching
@@ -464,8 +529,8 @@ Analyzer customAnalyzer = new Analyzer() {
 
 1. **Choose the Right Directory Implementation**:
    - MMapDirectory for most applications (default in 9.8)
+   - ByteBuffersDirectory for testing/small indices
    - NIOFSDirectory as a fallback
-   - RAMDirectory for testing
 
 2. **Optimize Index Writing**:
    - Use appropriate RAM buffer size (IndexWriterConfig.setRAMBufferSizeMB)
