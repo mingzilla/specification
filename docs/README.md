@@ -25,6 +25,7 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 - [Flux - Reactor - Spring Web Flux](https://mingzilla.github.io/specification/spring-web-flux)
 - [Flux - Reactor - Java Reactive Concurrency Guide](https://mingzilla.github.io/specification/java-reactive-concurrency-guide)
 - [LlmClient - Draft Design Spec](https://mingzilla.github.io/specification/llm-client-spec-draft)
+- [Redis Pub Sub With Reactor](draft/2025-04-12_redis-pub-sub/ai-copilot-redis-implementation-v2.md)
 
 
 ## AWS Bedrock Provider Implementation Solution (Draft)
@@ -37,7 +38,7 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 - [Component Diagnostics Utility Specification](https://mingzilla.github.io/specification/other/diagnostic-util-spec/diagnostic-util-spec)
 
 
-## Other
+## Cheat Sheet
 
 - [Cheat Sheet - Java Stream API](https://mingzilla.github.io/specification/other/java-stream-api)
 - [Cheat Sheet - Apache Lucene 9.8](https://mingzilla.github.io/specification/other/lucene-9.8-cheatsheet)
