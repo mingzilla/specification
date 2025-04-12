@@ -43,6 +43,10 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 - [Cheat Sheet - Java Stream API](https://mingzilla.github.io/specification/other/java-stream-api)
 - [Cheat Sheet - Apache Lucene 9.8](https://mingzilla.github.io/specification/other/lucene-9.8-cheatsheet)
 
+## Other
+
+- [Confusing Terminologies](other/terminologies.md)
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
