@@ -1,4 +1,12 @@
-# Terminologies
+## General Terminologies
+Translate Terminologies into human words.
+
+### AI Agent
+- AI Agent == LLM Model + Tools
+
+----
+
+## Confusing Terminologies
 Confusing terms that means something simple. Whoever invented these terms deserve a slap in their face.
 
 ### Content Negotiation
