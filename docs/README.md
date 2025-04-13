@@ -36,6 +36,7 @@ MCP Sampling is to implement a sampleHandler callback function, which can be cal
 ## Observability
 
 - [Component Diagnostics Utility Specification](https://mingzilla.github.io/specification/other/diagnostic-util-spec/diagnostic-util-spec)
+- [Diagnostics Guildeline](other/diagnostic-util-spec/diagnostics-guidelines.md)
 
 
 ## Cheat Sheet
