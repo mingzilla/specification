@@ -46,6 +46,22 @@ sink.tryEmitNext("another value");
 sink.tryEmitComplete();
 ```
 
+#### Using Runnable/Callable
+```java
+Mono<String> mono = Mono.fromCallable(() -> {
+    System.out.println("Hello");
+    return "World";
+});
+
+// Nothing happens here (lazy)
+Mono<String> mapped = mono.map(String::toUpperCase);  
+
+// THIS triggers the actual execution
+mapped.subscribe(item -> System.out.println(item)); // Output: "Hello", \n "WORLD"
+// Or do this to trigger the execution:
+mapped.block(); // Output: "Hello" - because the word "WORLD" is not printted
+```
+
 ### Spring WebFlux/Reactor - Mono Example
 
 ```java
