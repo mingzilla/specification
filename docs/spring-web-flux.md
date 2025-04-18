@@ -53,13 +53,17 @@ Mono<String> mono = Mono.fromCallable(() -> {
     return "World";
 });
 
-// Nothing happens here (lazy)
+// Pipeline setup (nothing executes yet)
 Mono<String> mapped = mono.map(String::toUpperCase);  
 
 // THIS triggers the actual execution
+mono.subscribe(item -> System.out.println(item)); // Output: "Hello", \n "World"
+// Or do this to trigger the execution:
 mapped.subscribe(item -> System.out.println(item)); // Output: "Hello", \n "WORLD"
 // Or do this to trigger the execution:
-mapped.block(); // Output: "Hello" - because the word "WORLD" is not printted
+String txt1 = mono.block(); // Output: "Hello", returns "World" and assign to txt1
+// or do this to trigger the execution:
+String txt2 = mapped.block(); // Output: "Hello", returns "WORLD" and assign to txt2
 ```
 
 ### Spring WebFlux/Reactor - Mono Example
