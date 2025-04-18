@@ -95,6 +95,28 @@ mono.subscribe(
 );
 ```
 
+### Error Handling
+
+#### doOnError - sends error to subscriber error branch
+```java
+Mono.error(new Exception("boom"))
+    .doOnError(e -> log.error("Error occurred")) // Just logs
+    .subscribe(
+        v -> {}, // Never called
+        e -> System.out.println("Subscriber got: " + e) // Receives the error
+    );
+```
+
+#### onErrorResume - emits a value to subscriber success branch
+```java
+Mono.error(new Exception("boom"))
+    .onErrorResume(e -> Mono.just("recovered")) // Replaces error
+    .subscribe(
+        v -> System.out.println("Subscriber got: " + v), // Receives "recovered" 
+        e -> {} // Never called
+    );
+```
+
 ## Operator and Concept Comparison
 
 ### 1. Core Stream Components
