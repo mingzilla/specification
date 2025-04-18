@@ -97,7 +97,9 @@ mono.subscribe(
 
 ### Error Handling
 
-#### doOnError - sends error to subscriber error branch
+#### doOnError - Just a side effect
+Just a side effect, regardless it's presents, error is sent to the subscriber error branch
+
 ```java
 Mono.error(new Exception("boom"))
     .doOnError(e -> log.error("Error occurred")) // Just logs
@@ -107,7 +109,9 @@ Mono.error(new Exception("boom"))
     );
 ```
 
-#### onErrorResume - emits a value to subscriber success branch
+#### onErrorResume - emits a value
+Emits a value to subscriber success branch
+
 ```java
 Mono.error(new Exception("boom"))
     .onErrorResume(e -> Mono.just("recovered")) // Replaces error
