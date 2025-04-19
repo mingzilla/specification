@@ -399,3 +399,143 @@ The key insight: the network request isn't made until something subscribes to th
             .takeUntil(LlmClientOutputChunk::done);
     }
 ```
+
+## Simplified Code Examples
+
+```java
+
+import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
+
+class TutorialTest {
+
+    /*
+    To summarize the key difference:
+    - subscribe(): Triggers asynchronous execution and returns immediately
+    - block(): Forces synchronous execution, blocking the current thread until complete
+    */
+
+    @Test
+    void just() {
+        Mono<String> mono = Mono.just("Hello just");
+
+        mono.subscribe(System.out::println);
+    }
+
+    @Test
+    void just__block() {
+        Mono<String> mono = Mono.just("Hello just");
+
+        Object v = mono.block();
+
+        assert "Hello just".equals(v);
+    }
+
+    /*=========================*/
+
+    @Test
+    void callable() {
+        Mono<String> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        });
+
+        mono.subscribe(System.out::println);
+    }
+
+    @Test
+    void callable__block() {
+        Mono<String> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        });
+
+        Object v = mono.block();
+
+        assert "Hello callable".equals(v);
+    }
+
+    /*=========================*/
+
+    @Test
+    void change_to_mono_void() {
+        Mono<Void> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        }).then(); // .then() turns Mono<String> to Mono<Void>
+
+        mono.subscribe(); // .subscribe() cannot have parameter here, because it's void
+    }
+
+    @Test
+    void change_to_mono_void__block() {
+        Mono<Void> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        }).then(); // .then() turns Mono<String> to Mono<Void>
+
+        Object v = mono.block();
+
+        assert v == null; // String is converted into null by .then()
+    }
+
+    /*=========================*/
+
+    @Test
+    void nested_callable() {
+        Mono<Mono<String>> nestedMono = Mono.fromCallable(() -> {
+            return Mono.just("Hello nested callable");
+        });
+
+        nestedMono.subscribe(mono -> {
+            mono.subscribe(System.out::println);
+        });
+    }
+
+    @Test
+    void nested_callable__block() {
+        Mono<Mono<String>> nestedMono = Mono.fromCallable(() -> {
+            return Mono.just("Hello nested callable");
+        });
+
+        /*
+        The below does not work, you cannot double block
+        Mono<String> mono = nestedMono.block();
+        String v = mono.block();
+        */
+
+        // This is the correct way to flatten a nested mono
+        // flatMap(callback) - the callback can only return a Mono/Flux, so you can only use flatMap for:
+        // 1. nested mono -> directly return x to unwrap it
+        // 2. non-nested mono -> return Mono.just(x) to wrap a flat value back into a Mono (next example)
+        Mono<String> mono = nestedMono.flatMap(x -> x); // flatmap unwraps a nested mono
+
+        Object v = mono.block();
+
+        assert "Hello nested callable".equals(v);
+    }
+
+    /*=========================*/
+
+    @Test
+    void callable_chain() {
+        Mono<String> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        }).flatMap(v -> {
+            // inside the chain, it needs to return a Mono to merge to the outside
+            return Mono.just(v + " chain"); // since flatMap unwraps a Mono, Mono.just() wraps it back as a mono
+        });
+
+        mono.subscribe(System.out::println);
+    }
+
+    @Test
+    void callable_chain__block() {
+        Mono<String> mono = Mono.fromCallable(() -> {
+            return "Hello callable";
+        }).flatMap(v -> {
+            return Mono.just(v + " chain");
+        });
+
+        Object v = mono.block();
+
+        assert "Hello callable chain".equals(v);
+    }
+}
+```
