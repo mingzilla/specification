@@ -456,6 +456,41 @@ class TutorialTest {
     /*=========================*/
 
     @Test
+    void defer() {
+        // difference between fromCallable and defer:
+        // fromCallable -> return value -- auto wrap into Mono
+        // defer -> return Mono.just(value) -- manual wrap into Mono
+        Mono<String> mono = Mono.defer(() -> {
+            return Mono.just("Hello defer");
+        });
+
+        mono.subscribe(System.out::println);
+    }
+
+    @Test
+    void callable_defer_difference() {
+        // mono1 and mono2 are identical
+        Mono<String> mono1 = Mono.fromCallable(() -> "Hello callable");
+        Mono<String> mono2 = Mono.defer(() -> Mono.just("Hello defer"));
+
+        mono1.subscribe(System.out::println);
+        mono2.subscribe(System.out::println);
+    }
+
+    @Test
+    void defer__block() {
+        Mono<String> mono = Mono.defer(() -> {
+            return Mono.just("Hello defer");
+        });
+
+        Object v = mono.block();
+
+        assert "Hello defer".equals(v);
+    }
+
+    /*=========================*/
+
+    @Test
     void change_to_mono_void() {
         Mono<Void> mono = Mono.fromCallable(() -> {
             return "Hello callable";
