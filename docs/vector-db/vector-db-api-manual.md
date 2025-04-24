@@ -121,7 +121,7 @@ vectorDbService.upsertOrLoadRecords(
 
 // Add multiple records in batch
 List<VectorDbInput> records = List.of(record1, record2, record3);
-vectorDbService.loadRecords(config, records).block();
+vectorDbService.loadRecords(config, () -> Mono.just(records)).block();
 
 // Initialize collection if empty
 vectorDbService.loadRecordsIfEmpty(config, records).block();
@@ -404,7 +404,7 @@ Implementation details:
 
 3. **Batch Processing**: Use batch loading for multiple records to improve performance:
    ```java
-   vectorDbService.loadRecords(config, records).block();
+   vectorDbService.loadRecords(config, () -> Mono.just(records)).block();
    ```
 
 4. **Namespaces**: Use namespaces to organize collections by domain or application.
