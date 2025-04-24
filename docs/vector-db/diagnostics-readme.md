@@ -76,6 +76,10 @@ Support for tracking diagnostic events in reactive streams (Mono/Flux), with met
 - Track lifecycle events (subscribe, success, error, completion)
 - Propagate context across asynchronous boundaries
 
+## Related Documents
+- [API Manual](diagnostics-api-manual.md)
+- [Behavior Specification](diagnostics-behaviour-spec.md)
+
 ## License
 
 [MIT License](LICENSE)
