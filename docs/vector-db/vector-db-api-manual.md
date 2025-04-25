@@ -1,16 +1,13 @@
-# Vector Database Library Manual
+# Vector Database Library Documentation
 
-This manual provides a comprehensive guide for using the Vector Database library, which enables semantic search capabilities through vector embeddings stored in Qdrant.
+This document provides comprehensive documentation for using the Vector Database library, which enables semantic search capabilities through vector embeddings stored in Qdrant.
 
 ## Table of Contents
 
-- [Vector Database Library Manual](#vector-database-library-manual)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Key Components](#key-components)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-  - [Basic Operations](#basic-operations)
+- [Overview](#overview)
+- [Key Components](#key-components)
+- [Prerequisites](#prerequisites)
+- [Code Examples](#code-examples)
     - [Creating and Configuring the Service](#creating-and-configuring-the-service)
     - [Adding Records](#adding-records)
     - [Searching Records](#searching-records)
@@ -18,22 +15,22 @@ This manual provides a comprehensive guide for using the Vector Database library
     - [Removing Records](#removing-records)
     - [Rebuilding the Index](#rebuilding-the-index)
     - [Collection Management](#collection-management)
-  - [Working with Namespaces](#working-with-namespaces)
-    - [Listing Namespaces](#listing-namespaces)
-    - [Listing Collections by Namespace](#listing-collections-by-namespace)
-    - [Deleting a Namespace](#deleting-a-namespace)
-  - [Advanced Search with Filtering](#advanced-search-with-filtering)
-    - [Basic Search](#basic-search)
-    - [Search with Score Threshold](#search-with-score-threshold)
-    - [Filtering with Match Any Strategy](#filtering-with-match-any-strategy)
-    - [Filtering with Match All Strategy](#filtering-with-match-all-strategy)
-    - [Combined Filtering](#combined-filtering)
-  - [Event Tracking](#event-tracking)
-  - [Distributed Locking](#distributed-locking)
-  - [Best Practices](#best-practices)
-  - [Troubleshooting](#troubleshooting)
+    - [Working with Namespaces](#working-with-namespaces)
+        - [Listing Namespaces](#listing-namespaces)
+        - [Listing Collections by Namespace](#listing-collections-by-namespace)
+        - [Deleting a Namespace](#deleting-a-namespace)
+    - [Advanced Search with Filtering](#advanced-search-with-filtering)
+        - [Basic Search](#basic-search)
+        - [Search with Score Threshold](#search-with-score-threshold)
+        - [Filtering with Match Any Strategy](#filtering-with-match-any-strategy)
+        - [Filtering with Match All Strategy](#filtering-with-match-all-strategy)
+        - [Combined Filtering](#combined-filtering)
+    - [Event Tracking](#event-tracking)
+    - [Distributed Locking](#distributed-locking)
+    - [Diagnostics](#diagnostics)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
-    - [Enabling Diagnostics](#enabling-diagnostics)
 
 ## Overview
 
@@ -59,324 +56,397 @@ The primary classes you'll need to use are:
 - **AttributeFilter**: Utility for creating search filters with different matching strategies
 - **VectorDbEvent**: Event model for tracking operation progress
 
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 
 - Qdrant running at http://localhost:6333
 - Ollama embedding service running at http://localhost:11434
 - The "nomic-embed-text" model loaded in Ollama
 
-## Basic Operations
+## Code Examples
+
+The examples below demonstrate how to use the Vector Database library for various operations. Each example can be found as a method in the `BasicOperations` class (see [Complete Example Class](#complete-example-class)).
 
 ### Creating and Configuring the Service
 
+To get started, create and configure the VectorDbService:
+
 ```java
-import com.panintelligence.vector.VectorDbService;
-import com.panintelligence.vector.model.VectorStoreConfig;
-
-// Create service
-VectorDbService vectorDbService = new VectorDbService();
-
-// Create configuration with authentication tokens (if required by reverse proxy)
-VectorStoreConfig config = VectorStoreConfig.create(
-        "http://embedding-service:11434/api/embeddings", // Embedding service URL
-        "nomic-embed-text",                              // Embedding model
-        "embedding_token",                               // Token for Ollama authentication (if required)
-        "http://qdrant-service:6333",                    // Qdrant URL
-        "qdrant_token",                                  // Token for Qdrant authentication (if required)
-        "my-namespace",                                  // Collection namespace
-        "my-collection"                                  // Collection name
-);
+public VectorStoreConfig createAndConfigureService() {
+    return VectorStoreConfig.create(
+            "http://embedding-service:11434/api/embeddings", // Embedding service URL
+            "nomic-embed-text",                              // Embedding model
+            "embedding_token",                               // Token for Ollama authentication (if required)
+            "http://qdrant-service:6333",                    // Qdrant URL
+            "qdrant_token",                                  // Token for Qdrant authentication (if required)
+            "my-namespace",                                  // Collection namespace
+            "my-collection"                                  // Collection name
+    );
+}
 ```
 
-Note: Authentication tokens for both Ollama and Qdrant are optional and should be provided only if the services are configured to require token verification (typically via a reverse proxy). The library will include the tokens in the appropriate headers when making requests to these services.
+Note: Authentication tokens for both Ollama and Qdrant are optional and should be provided only if the services are configured to require token verification (typically via a reverse proxy).
 
 ### Adding Records
 
+There are several ways to add records to the vector database:
+
 ```java
-import com.panintelligence.vector.model.AttributeGroup;
-import com.panintelligence.vector.model.VectorDbInput;
-import reactor.core.publisher.Mono;
+public void addingRecords() {
+    VectorStoreConfig config = createAndConfigureService();
 
-import java.util.List;
+    // Create an input record
+    VectorDbInput record = new VectorDbInput(
+            1,                                              // Unique record ID
+            "Sales by Region",                              // Record name
+            List.of(                                        // Attribute groups
+                    new AttributeGroup("dimensions", List.of("Region", "Date")),
+                    new AttributeGroup("measures", List.of("Sales Amount", "Quantity"))
+            ),
+            System.currentTimeMillis()                      // Updated timestamp
+    );
 
-// Create an input record
-VectorDbInput record = new VectorDbInput(
-    1,                                              // Unique record ID
-    "Sales by Region",                              // Record name
-    List.of(                                        // Attribute groups
-        new AttributeGroup("dimensions", List.of("Region", "Date")),
-        new AttributeGroup("measures", List.of("Sales Amount", "Quantity"))
-    ),
-    System.currentTimeMillis()                      // Updated timestamp
-);
+    // Create a list of all records (for collection initialization)
+    List<VectorDbInput> allRecords = List.of(record);
 
-// Smart upsert with auto-loading (recommended approach)
-vectorDbService.upsertOrLoadRecords(
-    config, 
-    record, 
-    () -> Mono.just(allRecords) // Supplier for all records if collection is empty
-).block();
+    // Smart upsert with auto-loading (recommended approach)
+    vectorDbService.upsertOrLoadRecords(
+            config,
+            record,
+            () -> Mono.just(allRecords) // Supplier for all records if collection is empty
+    ).block();
 
-// Add multiple records in batch
-List<VectorDbInput> records = List.of(record1, record2, record3);
-vectorDbService.loadRecords(config, () -> Mono.just(records)).block();
+    // Add multiple records in batch
+    List<VectorDbInput> records = List.of(record1, record2, record3);
+    vectorDbService.loadRecords(config, () -> Mono.just(records)).block();
 
-// Initialize collection if empty
-vectorDbService.loadRecordsIfEmpty(config, records).block();
+    // Initialize collection if empty
+    vectorDbService.loadRecordsIfEmpty(config, records).block();
+}
 ```
 
 ### Searching Records
 
+Perform basic searches with the vector database:
+
 ```java
-import com.panintelligence.vector.model.VectorDbQuery;
-import com.panintelligence.vector.model.VectorDbSearchResult;
+public void searchingRecords() {
+    VectorStoreConfig config = createAndConfigureService();
 
-// Basic search query
-String query = "sales performance by geographical area";
-int limit = 5;
-VectorDbQuery basicQuery = VectorDbQuery.basic(query, limit);
+    // Basic search query
+    String query = "sales performance by geographical area";
+    int limit = 5;
+    VectorDbQuery basicQuery = VectorDbQuery.basic(query, limit);
 
-// Execute search
-List<VectorDbSearchResult> results = vectorDbService
-    .findRelevantRecords(config, basicQuery)
-    .block();
+    // Execute search
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, basicQuery)
+            .block();
 
-// Process results
-for (VectorDbSearchResult result : results) {
-    System.out.println("ID: " + result.id());
-    System.out.println("Name: " + result.name());
-    System.out.println("Score: " + result.score());
-    System.out.println("Attributes: " + result.attributeGroups());
-    System.out.println("---");
+    // Process results
+    if (results != null) {
+        for (VectorDbSearchResult result : results) {
+            System.out.println("ID: " + result.id());
+            System.out.println("Name: " + result.name());
+            System.out.println("Score: " + result.score());
+            System.out.println("Attributes: " + result.attributeGroups());
+            System.out.println("---");
+        }
+    }
 }
 ```
 
 ### Updating Records
 
-```java
-// Upsert a record (update if exists, insert if not)
-VectorDbInput updatedRecord = new VectorDbInput(
-    1,                                              // Existing ID to update
-    "Sales by Region (Updated)",                    // Updated name
-    List.of(new AttributeGroup("dimensions", List.of("Region", "Date", "Product"))),
-    System.currentTimeMillis()                      // Current timestamp
-);
+Update existing records using the smart upsert method:
 
-// Smart upsert with auto-detection of collection state
-vectorDbService.upsertOrLoadRecords(
-    config, 
-    updatedRecord, 
-    () -> Mono.just(allRecords) // Supplier for all records if collection is empty
-).block();
+```java
+public void updatingRecords() {
+    VectorStoreConfig config = createAndConfigureService();
+
+    // Create a list of all records (for collection initialization)
+    List<VectorDbInput> allRecords = getAllRecordsFromDatabase();
+
+    // Upsert a record (update if exists, insert if not)
+    VectorDbInput updatedRecord = new VectorDbInput(
+            1,                                              // Existing ID to update
+            "Sales by Region (Updated)",                    // Updated name
+            List.of(new AttributeGroup("dimensions", List.of("Region", "Date", "Product"))),
+            System.currentTimeMillis()                      // Current timestamp
+    );
+
+    // Smart upsert with auto-detection of collection state
+    vectorDbService.upsertOrLoadRecords(
+            config,
+            updatedRecord,
+            () -> Mono.just(allRecords) // Supplier for all records if collection is empty
+    ).block();
+}
 ```
 
 ### Removing Records
 
-```java
-// Remove a record by ID
-Integer recordIdToRemove = 1;
-vectorDbService.removeRecord(config, recordIdToRemove).block();
+Remove records individually or in batch:
 
-// Remove multiple records
-List<Integer> recordIds = List.of(1, 2, 3);
-vectorDbService.removeRecords(config, recordIds).block();
+```java
+public void removingRecords() {
+    VectorStoreConfig config = createAndConfigureService();
+
+    // Remove a record by ID
+    Integer recordIdToRemove = 1;
+    vectorDbService.removeRecord(config, recordIdToRemove).block();
+
+    // Remove multiple records
+    List<Integer> recordIds = List.of(1, 2, 3);
+    vectorDbService.removeRecords(config, recordIds).block();
+}
 ```
 
 ### Rebuilding the Index
 
-```java
-// Get all records (e.g., from your database)
-List<VectorDbInput> allRecords = getAllRecordsFromDatabase();
+Completely rebuild a collection index:
 
-// Rebuild the entire index (removes all existing records and adds new ones)
-int batchSize = 10;
-vectorDbService.rebuildIndex(config, allRecords, batchSize).block();
+```java
+public void rebuildingTheIndex() {
+    VectorStoreConfig config = createAndConfigureService();
+
+    // Get all records (e.g., from your database)
+    List<VectorDbInput> allRecords = getAllRecordsFromDatabase();
+
+    // Rebuild the entire index (removes all existing records and adds new ones)
+    vectorDbService.rebuildIndex(config, allRecords).block();
+}
 ```
 
 ### Collection Management
 
+Manage vector database collections:
+
 ```java
-// Check if a collection exists
-Boolean exists = vectorDbService.collectionExists(config).block();
+public void collectionManagement() {
+    VectorStoreConfig config = createAndConfigureService();
 
-// Delete a collection
-vectorDbService.deleteCollection(config).block();
+    // Check if a collection exists
+    Boolean exists = vectorDbService.collectionExists(config).block();
 
-// Clear all records in a collection but keep the collection structure
-vectorDbService.clearCollection(config).block();
+    // Delete a collection
+    vectorDbService.deleteCollection(config).block();
+
+    // Clear all records in a collection but keep the collection structure
+    vectorDbService.clearCollection(config).block();
+}
 ```
 
-## Working with Namespaces
+### Working with Namespaces
 
 Namespaces provide a way to organize collections, similar to schemas in a relational database.
 
-### Listing Namespaces
+#### Listing Namespaces
+
+List all available namespaces:
 
 ```java
-// List all namespaces
-Set<String> namespaces = vectorDbService.listNamespaces(config).block();
-System.out.println("Available namespaces: " + namespaces);
+public void listingNamespaces() {
+    VectorStoreConfig config = createAndConfigureService();
+
+    // List all namespaces
+    Set<String> namespaces = vectorDbService.listNamespaces(config).block();
+    System.out.println("Available namespaces: " + namespaces);
+}
 ```
 
-### Listing Collections by Namespace
+#### Listing Collections by Namespace
+
+List collections within a specific namespace:
 
 ```java
-// List collections in a specific namespace
-String namespace = "my-namespace";
-List<String> collections = vectorDbService
-    .listCollectionsByNamespace(config, namespace)
-    .block();
+public void listingCollectionsByNamespace() {
+    VectorStoreConfig config = createAndConfigureService();
 
-System.out.println("Collections in namespace '" + namespace + "': " + collections);
+    // List collections in a specific namespace
+    String namespace = "my-namespace";
+    List<String> collections = vectorDbService
+            .listCollectionsByNamespace(config, namespace)
+            .block();
+
+    System.out.println("Collections in namespace '" + namespace + "': " + collections);
+}
 ```
 
-### Deleting a Namespace
+#### Deleting a Namespace
+
+Delete all collections within a namespace:
 
 ```java
-// Delete all collections in a namespace
-String namespaceToDelete = "old-namespace";
-boolean confirmDelete = true; // Safety flag to prevent accidental deletion
+public void deletingANamespace() {
+    VectorStoreConfig config = createAndConfigureService();
 
-Integer deletedCount = vectorDbService
-    .deleteNamespace(config, namespaceToDelete, confirmDelete)
-    .block();
+    // Delete all collections in a namespace
+    String namespaceToDelete = "old-namespace";
+    boolean confirmDelete = true; // Safety flag to prevent accidental deletion
 
-System.out.println("Deleted " + deletedCount + " collections from namespace '" + namespaceToDelete + "'");
+    Integer deletedCount = vectorDbService
+            .deleteNamespace(config, namespaceToDelete, confirmDelete)
+            .block();
+
+    System.out.println("Deleted " + deletedCount + " collections from namespace '" + namespaceToDelete + "'");
+}
 ```
 
-## Advanced Search with Filtering
+### Advanced Search with Filtering
 
-### Basic Search
+The library provides advanced search capabilities with various filtering options.
+
+#### Basic Search
+
+Simple search with just a query and limit:
 
 ```java
-// Simple search with just a query and limit
-VectorDbQuery query = VectorDbQuery.basic("customer satisfaction", 5);
+public void basicSearch() {
+    // Simple search with just a query and limit
+    VectorDbQuery query = VectorDbQuery.basic("customer satisfaction", 5);
+
+    VectorStoreConfig config = createAndConfigureService();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, query)
+            .block();
+}
 ```
 
-### Search with Score Threshold
+#### Search with Score Threshold
+
+Search with a minimum score threshold:
 
 ```java
-// Search with a minimum score threshold
-VectorDbQuery query = new VectorDbQuery.Builder()
-    .limit(10)
-    .scoreThreshold(0.75f) // Only return results with similarity >= 0.75
-    .build("customer satisfaction");
+public void searchWithScoreThreshold() {
+    // Search with a minimum score threshold
+    VectorDbQuery query = new VectorDbQuery.Builder()
+            .limit(10)
+            .scoreThreshold(0.75f) // Only return results with similarity >= 0.75
+            .build("customer satisfaction");
+
+    VectorStoreConfig config = createAndConfigureService();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, query)
+            .block();
+}
 ```
 
-### Filtering with Match Any Strategy
+#### Filtering with Match Any Strategy
+
+Find records that match ANY of the specified attributes:
 
 ```java
-import com.panintelligence.vector.model.AttributeFilter;
+public void filteringWithMatchAnyStrategy() {
+    // Find records that have EITHER "Region" OR "Product" as dimensions
+    VectorDbQuery query = new VectorDbQuery.Builder()
+            .limit(10)
+            .withFilter(
+                    AttributeFilter.matchAny("dimensions", List.of("Region", "Product"))
+            )
+            .build("sales analysis");
 
-// Find records that have EITHER "Region" OR "Product" as dimensions
-VectorDbQuery query = new VectorDbQuery.Builder()
-    .limit(10)
-    .withFilter(
-        AttributeFilter.matchAny("dimensions", List.of("Region", "Product"))
-    )
-    .build("sales analysis");
+    VectorStoreConfig config = createAndConfigureService();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, query)
+            .block();
+}
 ```
 
-### Filtering with Match All Strategy
+#### Filtering with Match All Strategy
+
+Find records that match ALL of the specified attributes:
 
 ```java
-// Find records that have BOTH "Region" AND "Date" as dimensions
-VectorDbQuery query = new VectorDbQuery.Builder()
-    .limit(10)
-    .withFilter(
-        AttributeFilter.matchAll("dimensions", List.of("Region", "Date"))
-    )
-    .build("sales trends over time by region");
+public void filteringWithMatchAllStrategy() {
+    // Find records that have BOTH "Region" AND "Date" as dimensions
+    VectorDbQuery query = new VectorDbQuery.Builder()
+            .limit(10)
+            .withFilter(
+                    AttributeFilter.matchAll("dimensions", List.of("Region", "Date"))
+            )
+            .build("sales trends over time by region");
+
+    VectorStoreConfig config = createAndConfigureService();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, query)
+            .block();
+}
 ```
 
-### Combined Filtering
+#### Combined Filtering
+
+Use multiple filters together:
 
 ```java
-// Complex query with multiple filters
-// Find records that:
-// 1. Have EITHER "Region" OR "Store" as dimensions (matchAny)
-// 2. AND have "Sales Amount" as a measure (matchAll)
-VectorDbQuery query = new VectorDbQuery.Builder()
-    .limit(10)
-    .scoreThreshold(0.6f)
-    .withFilter(
-        AttributeFilter.matchAny("dimensions", List.of("Region", "Store"))
-    )
-    .withFilter(
-        AttributeFilter.matchAll("measures", List.of("Sales Amount"))
-    )
-    .build("regional sales performance");
+public void combinedFiltering() {
+    // Complex query with multiple filters
+    VectorDbQuery query = new VectorDbQuery.Builder()
+            .limit(10)
+            .scoreThreshold(0.6f)
+            .withFilter(
+                    AttributeFilter.matchAny("dimensions", List.of("Region", "Store"))
+            )
+            .withFilter(
+                    AttributeFilter.matchAll("measures", List.of("Sales Amount"))
+            )
+            .build("regional sales performance");
+
+    VectorStoreConfig config = createAndConfigureService();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, query)
+            .block();
+}
 ```
 
-## Event Tracking
+### Event Tracking
 
-The VectorDbService emits events for all major operations that can be subscribed to for monitoring:
-
-```java
-// Subscribe to events from the service
-vectorDbService.eventSubject.asFlux()
-    .subscribe(event -> {
-        System.out.println("Event: " + event.type());
-        System.out.println("Config: " + event.config().vectorDbParams().getCollectionFullName());
-        System.out.println("Data: " + event.data());
-    });
-```
-
-Available event types include:
+Monitor vector database operations through events:
 
 ```java
-// Load Records events
-LOAD_RECORDS__START
-LOAD_RECORDS__LOAD_IN_PROGRESS
-LOAD_RECORDS__LOCK_ACQUIRED
-LOAD_RECORDS__LOCK_FAILED_TO_ACQUIRE
-LOAD_RECORDS__START_EMBEDDING
-LOAD_RECORDS__SUCCEEDED
-LOAD_RECORDS__FAILED
-LOAD_RECORDS__ENDED
+public void eventTracking() {
+    // Subscribe to events from the service
+    vectorDbService.eventSubject.asFlux()
+            .subscribe(event -> {
+                System.out.println("Event: " + event.type());
+                System.out.println("Config: " + event.config().vectorDbParams().getCollectionFullName());
+                System.out.println("Data: " + event.data());
+            });
 
-// Upsert Auto-Load events
-UPSERT_OR_LOAD__START
-UPSERT_OR_LOAD__DISTRIBUTED_LOCK_DETECTED
-UPSERT_OR_LOAD__LOCAL_LOAD_IN_PROGRESS
-UPSERT_OR_LOAD__BATCH__SUBSCRIBED
-UPSERT_OR_LOAD__BATCH__SUCCEEDED
-UPSERT_OR_LOAD__BATCH__FAILED
-UPSERT_OR_LOAD__BATCH__ENDED
-UPSERT_OR_LOAD__SINGLE__SUBSCRIBED
-UPSERT_OR_LOAD__SINGLE__SUCCEEDED
-UPSERT_OR_LOAD__SINGLE__FAILED
-UPSERT_OR_LOAD__SINGLE__ENDED
-```
+    // Process specific event types
+    private void processEvent (VectorDbEvent event){
+        if (event == null) return;
 
-You can create an event handler to log or process these events:
-
-```java
-private void processEvent(VectorDbEvent event) {
-    switch (event.type()) {
-        case LOAD_RECORDS__SUCCEEDED:
-            logger.info("Successfully loaded all records");
-            break;
-        case UPSERT_OR_LOAD__BATCH__SUBSCRIBED:
-            logger.info("Auto-loading collection because it was empty");
-            break;
-        case LOAD_RECORDS__FAILED:
-            logger.error("Failed to load records: {}", event.data());
-            break;
-        // Handle other events as needed
+        switch (event.type()) {
+            case LOAD_RECORDS__SUCCEEDED:
+                System.out.println("Successfully loaded all records");
+                break;
+            case UPSERT_OR_LOAD__BATCH__SUBSCRIBED:
+                System.out.println("Auto-loading collection because it was empty");
+                break;
+            case LOAD_RECORDS__FAILED:
+                System.out.println("Failed to load records: " + event.data());
+                break;
+            // Handle other events as needed
+            default:
+                System.out.println("Other event received: " + event.type());
+                break;
+        }
     }
 }
 ```
 
-## Distributed Locking
+### Distributed Locking
 
-The library uses a distributed locking mechanism to coordinate operations between multiple application instances:
+Check for distributed lock service availability:
 
 ```java
-// Check if lock service is available
-Boolean lockServiceAvailable = vectorDbService.isLockServiceAvailable(config).block();
+public void distributedLocking() {
+    VectorStoreConfig config = createAndConfigureService();
+
+    // Check if lock service is available
+    Boolean lockServiceAvailable = vectorDbService.isLockServiceAvailable(config).block();
+    System.out.println("Lock service available: " + lockServiceAvailable);
+}
 ```
 
 The locking mechanism is automatically used by various operations:
@@ -385,13 +455,6 @@ The locking mechanism is automatically used by various operations:
 2. `rebuildIndex` - Acquires a distributed lock named "rebuild_index" for the collection
 3. `deleteNamespace` - Acquires a distributed lock named "delete_namespace" for the namespace
 4. `upsertOrLoadRecords` - Checks for existing distributed locks before proceeding
-
-Implementation details:
-
-- Locks are stored as vector records in a dedicated "vector_locks" collection in Qdrant
-- Each lock contains node identity information to track which node holds the lock
-- Locks automatically expire after 5 minutes to prevent deadlocks if a node crashes
-- The system can detect locks held by other nodes and will adjust behavior accordingly
 
 ## Best Practices
 
@@ -438,52 +501,55 @@ Implementation details:
    vectorDbService.close();
    ```
 
-9. **Security Model**: 
-   - Primary security should rely on network isolation (VPC)
-   - If token verification is needed, implement it in a reverse proxy rather than directly in the services
-   - Supply authentication tokens in the `VectorStoreConfig` when required by the reverse proxy
-   - The library supports sending these tokens with requests to both services
+9. **Security Model**:
+    - Primary security should rely on network isolation (VPC)
+    - If token verification is needed, implement it in a reverse proxy rather than directly in the services
+    - Supply authentication tokens in the `VectorStoreConfig` when required by the reverse proxy
+    - The library supports sending these tokens with requests to both services
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Connection Refused**:
-   - Ensure Qdrant is running at the configured URL
-   - Check if Ollama embedding service is running
+    - Ensure Qdrant is running at the configured URL
+    - Check if Ollama embedding service is running
 
 2. **Authentication Failures**:
-   - Verify authentication tokens are correct in the VectorStoreConfig if your services require token verification
-   - Check if the reverse proxy is properly configured to validate tokens
-   - Make sure the token format matches what the reverse proxy expects
+    - Verify authentication tokens are correct in the VectorStoreConfig if your services require token verification
+    - Check if the reverse proxy is properly configured to validate tokens
+    - Make sure the token format matches what the reverse proxy expects
 
 3. **Invalid Embedding Vectors**:
-   - Verify the embedding model is correctly loaded in Ollama
+    - Verify the embedding model is correctly loaded in Ollama
 
 4. **Collection Not Found**:
-   - Check that the namespace and collection name are correctly configured
-   - Verify the collection exists using listCollectionsByNamespace
+    - Check that the namespace and collection name are correctly configured
+    - Verify the collection exists using listCollectionsByNamespace
 
 5. **Performance Issues**:
-   - Use appropriate batch sizes for your data volume
-   - Consider increasing connection pool sizes for high concurrency
+    - Use appropriate batch sizes for your data volume
+    - Consider increasing connection pool sizes for high concurrency
 
 6. **Lock Acquisition Failures**:
-   - Ensure Qdrant service is accessible 
-   - Check if another process is holding the lock
-   - Monitor for events indicating lock failures
+    - Ensure Qdrant service is accessible
+    - Check if another process is holding the lock
+    - Monitor for events indicating lock failures
 
-### Enabling Diagnostics
+### Diagnostics
 
-The library integrates with a diagnostics framework for visibility into operations:
+Enable and use diagnostics for troubleshooting:
 
 ```java
-// Enable vector database diagnostics
-VectorDbDiagnostics.enable();
+public void enablingDiagnostics() {
+    // Enable vector database diagnostics
+    VectorDbDiagnostics.enable();
 
-// Get diagnostic summary
-String summary = VectorDbDiagnostics.getSummary();
+    // Get diagnostic summary
+    String summary = VectorDbDiagnostics.getSummary();
+    System.out.println("Diagnostics summary: " + summary);
 
-// Disable diagnostics
-VectorDbDiagnostics.disable();
+    // Disable diagnostics
+    VectorDbDiagnostics.disable();
+}
 ```

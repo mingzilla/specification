@@ -15,30 +15,32 @@ A lightweight, thread-safe diagnostics library for tracking and troubleshooting 
 ## Quick Start
 
 ```java
-// Generate a request ID
-String requestId = DiagnosticsUtil.generateRequestId();
+public void usage() {
+    // Generate a request ID
+    String requestId = DiagnosticsUtil.generateRequestId();
 
-// Enable diagnostics for a topic
-DiagnosticsUtil.enableTopic("VECTOR_DB");
+    // Enable diagnostics for a topic
+    DiagnosticsUtil.enableTopic("VECTOR_DB");
 
-// Create metadata for the request
-DiagnosticsMetadata metadata = DiagnosticsMetadata.of("VECTOR_DB", "BULK_LOAD", requestId);
+    // Create metadata for the request
+    DiagnosticsMetadata metadata = DiagnosticsMetadata.of("VECTOR_DB", "BULK_LOAD", requestId);
 
-// Log operation start with context data
-Map<String, Object> params = Map.of("configParam", "value");
-DiagnosticsUtil.info(metadata, "STARTED", "Operation started", params);
+    // Log operation start with context data
+    Map<String, Object> params = Map.of("configParam", "value");
+    DiagnosticsUtil.info(metadata, "STARTED", "Operation started", params);
 
-try {
-    // Perform operation...
-    DiagnosticsUtil.info(metadata, "COMPLETED", "Operation completed successfully");
-} catch (Exception e) {
-    DiagnosticsUtil.error(metadata, "FAILED", "Operation failed", e);
-    throw e;
+    try {
+        // Perform operation...
+        DiagnosticsUtil.info(metadata, "COMPLETED", "Operation completed successfully");
+    } catch (Exception e) {
+        DiagnosticsUtil.error(metadata, "FAILED", "Operation failed", e);
+        throw e;
+    }
+
+    // Get diagnostic summary
+    String summary = DiagnosticsUtil.getDiagnosticSummary("VECTOR_DB");
+    System.out.println(summary);
 }
-
-// Get diagnostic summary
-String summary = DiagnosticsUtil.getDiagnosticSummary("VECTOR_DB");
-System.out.println(summary);
 ```
 
 ## Documentation
@@ -77,6 +79,7 @@ Support for tracking diagnostic events in reactive streams (Mono/Flux), with met
 - Propagate context across asynchronous boundaries
 
 ## Related Documents
+
 - [API Manual](diagnostics-api-manual.md)
 - [Behavior Specification](diagnostics-behaviour-spec.md)
 

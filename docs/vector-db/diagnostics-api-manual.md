@@ -81,89 +81,93 @@ public class DiagnosticsReactiveUtil<T> {
 ### Basic Usage
 
 ```java
-// Generate a request ID
-String requestId = DiagnosticsUtil.generateRequestId();
-
-// Enable diagnostics for a topic
-DiagnosticsUtil.enableTopic("VECTOR_DB");
-
-// Create metadata for the request
-DiagnosticsMetadata metadata = DiagnosticsMetadata.of("VECTOR_DB", "BULK_LOAD", requestId);
-
-// Log with context data
-Map<String, Object> params = Map.of(
-    "vectorStoreConfig", config,
-    "inputSize", inputs.size()
-);
-DiagnosticsUtil.info(metadata, "READY", "Starting bulk load", params);
-
-try {
-    // Process request
-    DiagnosticsUtil.info(metadata, "STARTED", "Processing started");
-    // ... processing logic ...
-    if (results.isEmpty()) {
-        Map<String, Object> context = Map.of(
-            "filters", searchFilters,
-            "expectedResults", true
-        );
-        DiagnosticsUtil.warn(metadata, "NO_RESULTS", "Query returned no matching records", context);
-    } else {
-        DiagnosticsUtil.info(metadata, "SUCCEEDED", "Processing completed");
+public void usage() {
+    // Generate a request ID
+    String requestId = DiagnosticsUtil.generateRequestId();
+ 
+    // Enable diagnostics for a topic
+    DiagnosticsUtil.enableTopic("VECTOR_DB");
+ 
+    // Create metadata for the request
+    DiagnosticsMetadata metadata = DiagnosticsMetadata.of("VECTOR_DB", "BULK_LOAD", requestId);
+ 
+    // Log with context data
+    Map<String, Object> params = Map.of(
+            "vectorStoreConfig", config,
+            "inputSize", inputs.size()
+    );
+    DiagnosticsUtil.info(metadata, "READY", "Starting bulk load", params);
+ 
+    try {
+       // Process request
+       DiagnosticsUtil.info(metadata, "STARTED", "Processing started");
+       // ... processing logic ...
+       if (results.isEmpty()) {
+          Map<String, Object> context = Map.of(
+                  "filters", searchFilters,
+                  "expectedResults", true
+          );
+          DiagnosticsUtil.warn(metadata, "NO_RESULTS", "Query returned no matching records", context);
+       } else {
+          DiagnosticsUtil.info(metadata, "SUCCEEDED", "Processing completed");
+       }
+    } catch (Exception e) {
+       DiagnosticsUtil.error(metadata, "FAILED", "Processing failed", e);
+       throw e;
+    } finally {
+       DiagnosticsUtil.info(metadata, "ENDED", "Request ended");
     }
-} catch (Exception e) {
-    DiagnosticsUtil.error(metadata, "FAILED", "Processing failed", e);
-    throw e;
-} finally {
-    DiagnosticsUtil.info(metadata, "ENDED", "Request ended");
+ 
+    // View diagnostics
+    String summary = DiagnosticsUtil.getDiagnosticSummary("VECTOR_DB");
+    System.out.println(summary);
 }
-
-// View diagnostics
-String summary = DiagnosticsUtil.getDiagnosticSummary("VECTOR_DB");
-System.out.println(summary);
 ```
 
 ### Reactive Usage
 
 ```java
-// Create metadata for the request
-DiagnosticsMetadata metadata = DiagnosticsMetadata.of("DATA_FETCH", "USER_LOOKUP", requestId);
+public Mono<Void> reactiveUsage() {
+    // Create metadata for the request
+    DiagnosticsMetadata metadata = DiagnosticsMetadata.of("DATA_FETCH", "USER_LOOKUP", requestId);
 
-// Add context data
-Map<String, Object> requestData = Map.of(
-    "userId", userId,
-    "requestTime", Instant.now()
-);
+    // Add context data
+    Map<String, Object> requestData = Map.of(
+            "userId", userId,
+            "requestTime", Instant.now()
+    );
 
-// Create a reactive stream
-Mono<User> userMono = userRepository.findById(userId)
-    .flatMap(user -> validateUser(user))
-    .onErrorResume(e -> fallbackUser());
+    // Create a reactive stream
+    Mono<User> userMono = userRepository.findById(userId)
+            .flatMap(user -> validateUser(user))
+            .onErrorResume(e -> fallbackUser());
 
-// Instrument the Mono chain with diagnostics
-return DiagnosticsReactiveUtil.chainMono(metadata, userMono, requestData)
-    .doOnSubscribe(s -> System.out.println("Subscribed"))
-    .doOnSuccess(v -> System.out.println("Success"))
-    .doOnError(e -> System.out.println("Error: " + e.getMessage()))
-    .doFinally(signal -> System.out.println("Completed with signal: " + signal))
-    .applyMono();
+    // Instrument the Mono chain with diagnostics
+    return DiagnosticsReactiveUtil.chainMono(metadata, userMono, requestData)
+           .doOnSubscribe(s -> System.out.println("Subscribed"))
+           .doOnSuccess(v -> System.out.println("Success"))
+           .doOnError(e -> System.out.println("Error: " + e.getMessage()))
+           .doFinally(signal -> System.out.println("Completed with signal: " + signal))
+           .applyMono();
+}
 ```
 
 ## Common Use Cases
 
 1. **Configuration Validation**
-   - Record configuration parameters at the start of operations
-   - Validate and report issues with external service configurations
-   - Track connection attempts to dependent services
+    - Record configuration parameters at the start of operations
+    - Validate and report issues with external service configurations
+    - Track connection attempts to dependent services
 
 2. **Error Tracking**
-   - Correlate errors across distributed systems using request IDs
-   - Capture detailed context at failure points
-   - Provide actionable troubleshooting information
+    - Correlate errors across distributed systems using request IDs
+    - Capture detailed context at failure points
+    - Provide actionable troubleshooting information
 
 3. **Performance Monitoring**
-   - Track operation durations across request lifecycles
-   - Identify slow operations or unexpected delays
-   - Correlate performance issues with configuration settings
+    - Track operation durations across request lifecycles
+    - Identify slow operations or unexpected delays
+    - Correlate performance issues with configuration settings
 
 ## Diagnostic Summary Format
 

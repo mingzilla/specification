@@ -4,10 +4,10 @@ This document provides specifications for deploying the vector database system i
 
 ## System Components
 
-| Service | Container Image | Purpose | Ports |
-|---------|----------------|---------|-------|
-| **Ollama Embedding Service** | `mingzilla/ollama-nomic-embed:latest` | Provides text embedding generation using the nomic-embed-text model | 11434 (HTTP) |
-| **Qdrant Vector Database** | `qdrant/qdrant:latest` | Stores and searches vector embeddings | 6333 (HTTP API), 6334 (gRPC) |
+| Service                      | Container Image                       | Purpose                                                             | Ports                        |
+|------------------------------|---------------------------------------|---------------------------------------------------------------------|------------------------------|
+| **Ollama Embedding Service** | `mingzilla/ollama-nomic-embed:latest` | Provides text embedding generation using the nomic-embed-text model | 11434 (HTTP)                 |
+| **Qdrant Vector Database**   | `qdrant/qdrant:latest`                | Stores and searches vector embeddings                               | 6333 (HTTP API), 6334 (gRPC) |
 
 ## Deployment Pattern
 
@@ -26,36 +26,36 @@ This document provides specifications for deploying the vector database system i
 
 ### Connectivity Requirements
 
-| Service | Source | Destination | Port | Protocol |
-|---------|--------|-------------|------|----------|
-| PI Dashboard → Ollama | Dashboard Nodes | Ollama Service | 11434 | HTTP |
-| PI Dashboard → Qdrant | Dashboard Nodes | Qdrant Service | 6333 | HTTP |
-| Ollama → Internet | Ollama Service | Internet | 443 | HTTPS |
+| Service               | Source          | Destination    | Port  | Protocol |
+|-----------------------|-----------------|----------------|-------|----------|
+| PI Dashboard → Ollama | Dashboard Nodes | Ollama Service | 11434 | HTTP     |
+| PI Dashboard → Qdrant | Dashboard Nodes | Qdrant Service | 6333  | HTTP     |
+| Ollama → Internet     | Ollama Service  | Internet       | 443   | HTTPS    |
 
 ## Resource Requirements
 
-| Service | CPU | Memory | Storage |
-|---------|-----|--------|---------|
-| Ollama | 2 cores (minimum)<br>4 cores (recommended) | 4GB (minimum)<br>8GB (recommended) | 2GB |
-| Qdrant | 1 core (minimum)<br>2 cores (recommended) | 2GB (minimum)<br>4GB (recommended) | Ephemeral (see persistence notes) |
+| Service | CPU                                        | Memory                             | Storage                           |
+|---------|--------------------------------------------|------------------------------------|-----------------------------------|
+| Ollama  | 2 cores (minimum)<br>4 cores (recommended) | 4GB (minimum)<br>8GB (recommended) | 2GB                               |
+| Qdrant  | 1 core (minimum)<br>2 cores (recommended)  | 2GB (minimum)<br>4GB (recommended) | Ephemeral (see persistence notes) |
 
 ## Persistence Configuration
 
 - **Qdrant**: No persistent volume needed
-  - Vectors are rebuilt on service restart
-  - This is an intentional design choice to avoid volume maintenance
-  - The embedding model ensures consistent vector generation
+    - Vectors are rebuilt on service restart
+    - This is an intentional design choice to avoid volume maintenance
+    - The embedding model ensures consistent vector generation
 
 - **Ollama**: No persistent volume needed
-  - The custom image `mingzilla/ollama-nomic-embed` has the model pre-installed
-  - No model downloading or storage is required
+    - The custom image `mingzilla/ollama-nomic-embed` has the model pre-installed
+    - No model downloading or storage is required
 
 ## Health Checks
 
-| Service | Endpoint | Initial Delay | Interval | Timeout |
-|---------|----------|---------------|----------|---------|
-| Ollama | `http://localhost:11434/api/version` | 30s | 10s | 5s |
-| Qdrant | `http://localhost:6333/health` | 5s | 10s | 5s |
+| Service | Endpoint                             | Initial Delay | Interval | Timeout |
+|---------|--------------------------------------|---------------|----------|---------|
+| Ollama  | `http://localhost:11434/api/version` | 30s           | 10s      | 5s      |
+| Qdrant  | `http://localhost:6333/health`       | 5s            | 10s      | 5s      |
 
 ## Scaling Considerations
 
@@ -67,10 +67,10 @@ This document provides specifications for deploying the vector database system i
 
 ### Environment Variables
 
-| Service | Variable | Value | Purpose |
-|---------|----------|-------|---------|
-| Ollama | `OLLAMA_HOST` | `0.0.0.0` | Binds to all network interfaces |
-| Qdrant | `QDRANT_ALLOW_RECOVERY_MODE` | `false` | Prevents automatic recovery attempts on startup |
+| Service | Variable                     | Value     | Purpose                                         |
+|---------|------------------------------|-----------|-------------------------------------------------|
+| Ollama  | `OLLAMA_HOST`                | `0.0.0.0` | Binds to all network interfaces                 |
+| Qdrant  | `QDRANT_ALLOW_RECOVERY_MODE` | `false`   | Prevents automatic recovery attempts on startup |
 
 ### Using a Reverse Proxy for Token Verification
 
@@ -93,34 +93,35 @@ VectorStoreConfig config = VectorStoreConfig.create(
 ```
 
 The library will include these tokens in the appropriate headers when making requests to these services:
+
 - For Ollama: Currently sent in a custom header, but will be changed to the Authorization header with Bearer format
 - For Qdrant: Currently sent in the "api-key" header, but will be changed to the Authorization header with Bearer format
 
 ## Additional Notes
 
 1. **Service Discovery**:
-   - Use standard Kubernetes service discovery
-   - Services should be accessible within the cluster by name
+    - Use standard Kubernetes service discovery
+    - Services should be accessible within the cluster by name
 
 2. **Monitoring**:
-   - Both services expose metrics that can be scraped by Prometheus
-   - Qdrant exposes metrics at `/metrics`
+    - Both services expose metrics that can be scraped by Prometheus
+    - Qdrant exposes metrics at `/metrics`
 
 3. **Disaster Recovery**:
-   - No special backup procedures required
-   - The system is designed to rebuild vectors as needed
+    - No special backup procedures required
+    - The system is designed to rebuild vectors as needed
 
 4. **Deployment Schedule**:
-   - Services can be deployed ahead of PI dashboard updates
-   - No special initialization is required beyond container startup
+    - Services can be deployed ahead of PI dashboard updates
+    - No special initialization is required beyond container startup
 
 5. **Rolling Updates**:
-   - Standard Kubernetes rolling update procedures can be used
-   - No special handling required for upgrades
+    - Standard Kubernetes rolling update procedures can be used
+    - No special handling required for upgrades
 
 6. **Security Considerations**:
-   - The primary security mechanism should be network isolation via VPC/private subnet
-   - If token verification is needed, implement it consistently via a reverse proxy
-   - Store authentication tokens in Kubernetes secrets or other secure credential storage
-   - Rotate tokens periodically according to your security policy
-   - Token verification provides an additional layer of protection if network configuration errors occur
+    - The primary security mechanism should be network isolation via VPC/private subnet
+    - If token verification is needed, implement it consistently via a reverse proxy
+    - Store authentication tokens in Kubernetes secrets or other secure credential storage
+    - Rotate tokens periodically according to your security policy
+    - Token verification provides an additional layer of protection if network configuration errors occur

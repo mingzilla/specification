@@ -16,52 +16,54 @@ A high-performance, reactive Java library for semantic search using vector embed
 ## Quick Start
 
 ```java
-// Create service with configuration
-VectorDbService vectorDbService = new VectorDbService();
+public void usage() {
+    // Create service with configuration
+    VectorDbService vectorDbService = new VectorDbService();
 
-// Use config with authentication tokens if services require them
-VectorStoreConfig config = VectorStoreConfig.create(
-    "http://localhost:11434/api/embeddings",  // Embedding service URL
-    "nomic-embed-text",                       // Embedding model
-    "embedding_token",                        // Token for Ollama (if required by reverse proxy)
-    "http://localhost:6333",                  // Qdrant URL
-    "qdrant_token",                           // Token for Qdrant (if required by reverse proxy)
-    "default",                                // Namespace
-    "vector_store"                            // Collection name
-);
+    // Use config with authentication tokens if services require them
+    VectorStoreConfig config = VectorStoreConfig.create(
+            "http://localhost:11434/api/embeddings",  // Embedding service URL
+            "nomic-embed-text",                       // Embedding model
+            "embedding_token",                        // Token for Ollama (if required by reverse proxy)
+            "http://localhost:6333",                  // Qdrant URL
+            "qdrant_token",                           // Token for Qdrant (if required by reverse proxy)
+            "default",                                // Namespace
+            "vector_store"                            // Collection name
+    );
 
-// Add a record with attributes
-VectorDbInput record = new VectorDbInput(
-    1,                                              // ID
-    "Sales by Region",                              // Name
-    List.of(                                        // Attributes
-        new AttributeGroup("dimensions", List.of("Region", "Date")),
-        new AttributeGroup("measures", List.of("Sales Amount", "Quantity"))
-    ),
-    System.currentTimeMillis()                      // Updated timestamp
-);
+    // Add a record with attributes
+    VectorDbInput record = new VectorDbInput(
+            1,                                              // ID
+            "Sales by Region",                              // Name
+            List.of(                                        // Attributes
+                    new AttributeGroup("dimensions", List.of("Region", "Date")),
+                    new AttributeGroup("measures", List.of("Sales Amount", "Quantity"))
+            ),
+            System.currentTimeMillis()                      // Updated timestamp
+    );
 
-// Store the record with auto-initialization if needed
-vectorDbService.upsertOrLoadRecords(
-    config, 
-    record, 
-    () -> Mono.just(List.of(record)) // Supply all records if collection is empty
-).block();
+    // Store the record with auto-initialization if needed
+    vectorDbService.upsertOrLoadRecords(
+            config,
+            record,
+            () -> Mono.just(List.of(record)) // Supply all records if collection is empty
+    ).block();
 
-// Search for similar records
-String query = "sales performance by geographical area";
-int limit = 5;
-VectorDbQuery searchQuery = VectorDbQuery.basic(query, limit);
+    // Search for similar records
+    String query = "sales performance by geographical area";
+    int limit = 5;
+    VectorDbQuery searchQuery = VectorDbQuery.basic(query, limit);
 
-List<VectorDbSearchResult> results = vectorDbService
-    .findRelevantRecords(config, searchQuery)
-    .block();
+    List<VectorDbSearchResult> results = vectorDbService
+            .findRelevantRecords(config, searchQuery)
+            .block();
 
-// Process results
-results.forEach(result -> {
-    System.out.println("ID: " + result.id() + ", Score: " + result.score());
-    System.out.println("Name: " + result.name());
-});
+    // Process results
+    results.forEach(result -> {
+        System.out.println("ID: " + result.id() + ", Score: " + result.score());
+        System.out.println("Name: " + result.name());
+    });
+}
 ```
 
 ## Requirements
@@ -103,6 +105,7 @@ docker-compose up -d
 ```
 
 The services will be available at:
+
 - Ollama: http://localhost:11434
 - Qdrant: http://localhost:6333
 
