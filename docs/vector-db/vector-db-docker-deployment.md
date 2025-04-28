@@ -82,13 +82,13 @@ If authentication is required for these services, we recommend implementing a re
 
 ```java
 VectorStoreConfig config = VectorStoreConfig.create(
-    "http://ollama-service:11434/api/embeddings",  // Embedding service URL
-    "nomic-embed-text",                            // Embedding model
-    "your_ollama_token",                           // Token for Ollama (verified by reverse proxy)
-    "http://qdrant-service:6333",                  // Qdrant URL
-    "your_qdrant_token",                           // Token for Qdrant (verified by reverse proxy)
-    "default",                                     // Namespace
-    "vector_store"                                 // Collection name
+        "http://ollama-service:11434/api/embeddings",  // Embedding service URL
+        "nomic-embed-text",                            // Embedding model
+        "your_ollama_token",                           // Token for Ollama (verified by reverse proxy)
+        "http://qdrant-service:6333",                  // Qdrant URL
+        "your_qdrant_token",                           // Token for Qdrant (verified by reverse proxy)
+        "default",                                     // Namespace
+        "vector_store"                                 // Collection name
 );
 ```
 

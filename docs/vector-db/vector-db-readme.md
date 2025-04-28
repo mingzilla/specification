@@ -45,8 +45,8 @@ public void usage() {
     // Store the record with auto-initialization if needed
     vectorDbService.upsertOrLoadRecords(
             config,
-            record,
-            () -> Mono.just(List.of(record)) // Supply all records if collection is empty
+            List.of(record),
+            () -> Mono.just(List.of(record1, record2, record3)) // Supply all records if collection is empty
     ).block();
 
     // Search for similar records

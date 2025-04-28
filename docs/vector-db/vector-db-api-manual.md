@@ -4,33 +4,35 @@ This document provides comprehensive documentation for using the Vector Database
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Key Components](#key-components)
-- [Prerequisites](#prerequisites)
-- [Code Examples](#code-examples)
-    - [Creating and Configuring the Service](#creating-and-configuring-the-service)
-    - [Adding Records](#adding-records)
-    - [Searching Records](#searching-records)
-    - [Updating Records](#updating-records)
-    - [Removing Records](#removing-records)
-    - [Rebuilding the Index](#rebuilding-the-index)
-    - [Collection Management](#collection-management)
-    - [Working with Namespaces](#working-with-namespaces)
-        - [Listing Namespaces](#listing-namespaces)
-        - [Listing Collections by Namespace](#listing-collections-by-namespace)
-        - [Deleting a Namespace](#deleting-a-namespace)
-    - [Advanced Search with Filtering](#advanced-search-with-filtering)
-        - [Basic Search](#basic-search)
-        - [Search with Score Threshold](#search-with-score-threshold)
-        - [Filtering with Match Any Strategy](#filtering-with-match-any-strategy)
-        - [Filtering with Match All Strategy](#filtering-with-match-all-strategy)
-        - [Combined Filtering](#combined-filtering)
-    - [Event Tracking](#event-tracking)
-    - [Distributed Locking](#distributed-locking)
-    - [Diagnostics](#diagnostics)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-    - [Common Issues](#common-issues)
+- [Vector Database Library Documentation](#vector-database-library-documentation)
+    - [Table of Contents](#table-of-contents)
+    - [Overview](#overview)
+    - [Key Components](#key-components)
+    - [Prerequisites](#prerequisites)
+    - [Code Examples](#code-examples)
+        - [Creating and Configuring the Service](#creating-and-configuring-the-service)
+        - [Adding Records](#adding-records)
+        - [Searching Records](#searching-records)
+        - [Updating Records](#updating-records)
+        - [Removing Records](#removing-records)
+        - [Rebuilding the Index](#rebuilding-the-index)
+        - [Collection Management](#collection-management)
+        - [Working with Namespaces](#working-with-namespaces)
+            - [Listing Namespaces](#listing-namespaces)
+            - [Listing Collections by Namespace](#listing-collections-by-namespace)
+            - [Deleting a Namespace](#deleting-a-namespace)
+        - [Advanced Search with Filtering](#advanced-search-with-filtering)
+            - [Basic Search](#basic-search)
+            - [Search with Score Threshold](#search-with-score-threshold)
+            - [Filtering with Match Any Strategy](#filtering-with-match-any-strategy)
+            - [Filtering with Match All Strategy](#filtering-with-match-all-strategy)
+            - [Combined Filtering](#combined-filtering)
+        - [Event Tracking](#event-tracking)
+        - [Distributed Locking](#distributed-locking)
+    - [Best Practices](#best-practices)
+    - [Troubleshooting](#troubleshooting)
+        - [Common Issues](#common-issues)
+        - [Diagnostics](#diagnostics)
 
 ## Overview
 
@@ -105,22 +107,19 @@ public void addingRecords() {
             System.currentTimeMillis()                      // Updated timestamp
     );
 
-    // Create a list of all records (for collection initialization)
-    List<VectorDbInput> allRecords = List.of(record);
-
-    // Smart upsert with auto-loading (recommended approach)
-    vectorDbService.upsertOrLoadRecords(
-            config,
-            record,
-            () -> Mono.just(allRecords) // Supplier for all records if collection is empty
-    ).block();
-
     // Add multiple records in batch
-    List<VectorDbInput> records = List.of(record1, record2, record3);
+    List<VectorDbInput> allRecords = List.of(record1, record2, record3);
     vectorDbService.loadRecords(config, () -> Mono.just(records)).block();
 
     // Initialize collection if empty
     vectorDbService.loadRecordsIfEmpty(config, records).block();
+
+    // Smart upsert with auto-loading (recommended approach)
+    vectorDbService.upsertOrLoadRecords(
+            config,
+            List.of(record),
+            () -> Mono.just(allRecords) // Supplier for all records if collection is empty
+    ).block();
 }
 ```
 
@@ -177,7 +176,7 @@ public void updatingRecords() {
     // Smart upsert with auto-detection of collection state
     vectorDbService.upsertOrLoadRecords(
             config,
-            updatedRecord,
+            List.of(updatedRecord),
             () -> Mono.just(allRecords) // Supplier for all records if collection is empty
     ).block();
 }
@@ -230,9 +229,6 @@ public void collectionManagement() {
 
     // Delete a collection
     vectorDbService.deleteCollection(config).block();
-
-    // Clear all records in a collection but keep the collection structure
-    vectorDbService.clearCollection(config).block();
 }
 ```
 
@@ -420,7 +416,7 @@ public void eventTracking() {
             case LOAD_RECORDS__SUCCEEDED:
                 System.out.println("Successfully loaded all records");
                 break;
-            case UPSERT_OR_LOAD__BATCH__SUBSCRIBED:
+            case UPSERT_OR_LOAD__LOAD__SUBSCRIBED:
                 System.out.println("Auto-loading collection because it was empty");
                 break;
             case LOAD_RECORDS__FAILED:
@@ -437,24 +433,12 @@ public void eventTracking() {
 
 ### Distributed Locking
 
-Check for distributed lock service availability:
+The locking mechanism is automatically used by batch processing operations:
 
-```java
-public void distributedLocking() {
-    VectorStoreConfig config = createAndConfigureService();
-
-    // Check if lock service is available
-    Boolean lockServiceAvailable = vectorDbService.isLockServiceAvailable(config).block();
-    System.out.println("Lock service available: " + lockServiceAvailable);
-}
-```
-
-The locking mechanism is automatically used by various operations:
-
-1. `loadRecords` - Acquires a distributed lock named "batch_processing" for the collection
-2. `rebuildIndex` - Acquires a distributed lock named "rebuild_index" for the collection
-3. `deleteNamespace` - Acquires a distributed lock named "delete_namespace" for the namespace
-4. `upsertOrLoadRecords` - Checks for existing distributed locks before proceeding
+1. `loadRecords` - Acquires a distributed lock
+2. `rebuildIndex` - Acquires a distributed lock
+3. `deleteNamespace` - Acquires a distributed lock
+4. `upsertOrLoadRecords` - Acquires lock if loading all records is needed
 
 ## Best Practices
 
@@ -462,7 +446,7 @@ The locking mechanism is automatically used by various operations:
 
 2. **Use Smart Upsert**: Prefer `upsertOrLoadRecords` for automatic handling of empty collections:
    ```java
-   vectorDbService.upsertOrLoadRecords(config, record, () -> Mono.just(allRecords)).block();
+   vectorDbService.upsertOrLoadRecords(config, List.of(record), () -> Mono.just(allRecords)).block();
    ```
 
 3. **Batch Processing**: Use batch loading for multiple records to improve performance:
